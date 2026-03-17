@@ -20,14 +20,14 @@ Web Sources
 ┌─────────────────────────────────────────────────────────────────┐
 │  Agent 2: Organize                                              │
 │  Sends raw articles to Claude Opus 4.6                          │
-│  → Produces a structured 8-section technical report            │
+│  → Produces a structured 8-section technical report             │
 └───────────────────────────┬─────────────────────────────────────┘
                             │ agent2_output.json
                             ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │  Agent 3: Summarize                                             │
 │  Sends the report to 5 AI models in parallel:                   │
-│    Claude Opus 4.6  ·  GPT-4o  ·  Gemini 1.5 Pro               │
+│    Claude Opus 4.6  ·  GPT-4o  ·  Gemini 1.5 Pro                │
 │    Mistral Large    ·  Cohere Command R+                        │
 │  → Claude consolidates all responses into one final summary     │
 └───────────────────────────┬─────────────────────────────────────┘
@@ -59,7 +59,6 @@ PulseAI/
 │   ├── app.py                    # Streamlit dashboard
 │   └── pyproject.toml            # Python dependencies (uv)
 ├── .env                          # Your API keys (gitignored)
-├── .env.example                  # Template — copy to .env
 ├── .gitignore
 └── README.md
 ```
