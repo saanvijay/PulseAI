@@ -93,11 +93,8 @@ Open `.env` and fill in your API keys:
 
 ```env
 # AI Models
-ANTHROPIC_API_KEY=your_anthropic_api_key      # platform.anthropic.com
-OPENAI_API_KEY=your_openai_api_key            # platform.openai.com
-GOOGLE_API_KEY=your_google_gemini_api_key     # aistudio.google.com
-MISTRAL_API_KEY=your_mistral_api_key          # console.mistral.ai
-COHERE_API_KEY=your_cohere_api_key            # dashboard.cohere.com
+ANTHROPIC_API_KEY=your_anthropic_api_key      # platform.anthropic.com — Agent 1 (web search), Agent 2, Agent 3 (Claude)
+OPENROUTER_API_KEY=your_openrouter_api_key    # openrouter.ai — Agent 3: GPT-4o, Gemini, Mistral, Cohere
 
 # Email — use a Gmail App Password, NOT your account password
 # Enable at: myaccount.google.com → Security → App Passwords
