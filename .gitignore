@@ -1,0 +1,16 @@
+# Environment
+.env
+
+# Node
+node_modules/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Agent outputs (runtime data, not source code)
+output/
+
+# OS
+.DS_Store
