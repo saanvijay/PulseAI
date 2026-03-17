@@ -1,9 +1,9 @@
-// Orchestrator: Runs all 4 agents in sequence
+// Orchestrator: Runs all agents in sequence
 
-import { fetchLatestAIConcepts } from './agents/agent1_fetch.js';
-import { organizeContent } from './agents/agent2_organize.js';
-import { summarizeWithMultipleModels } from './agents/agent3_summarize.js';
-import { publishResults } from './agents/agent4_publish.js';
+import { fetchLatestAIConcepts } from './agents/researcher_agent.js';
+import { organizeContent }       from './agents/analyst_agent.js';
+import { summarizeWithMultipleModels } from './agents/synthesizer_agent.js';
+import { publishResults }        from './agents/publisher_agent.js';
 
 async function runPipeline() {
   console.log('\n========================================');
@@ -12,29 +12,29 @@ async function runPipeline() {
 
   const startTime = Date.now();
 
-  // Agent 1: Fetch AI news
-  console.log('\n[Step 1/4] Running Agent 1: Fetch AI News');
-  const agent1Start = Date.now();
+  // Researcher: Fetch AI news from 16 sources
+  console.log('\n[Step 1/4] Researcher Agent: Fetching AI News');
+  const t1 = Date.now();
   await fetchLatestAIConcepts();
-  console.log(`  Completed in ${((Date.now() - agent1Start) / 1000).toFixed(1)}s\n`);
+  console.log(`  Completed in ${((Date.now() - t1) / 1000).toFixed(1)}s\n`);
 
-  // Agent 2: Organize content
-  console.log('[Step 2/4] Running Agent 2: Organize Content');
-  const agent2Start = Date.now();
+  // Analyst: Organize into structured report
+  console.log('[Step 2/4] Analyst Agent: Organizing Content');
+  const t2 = Date.now();
   await organizeContent();
-  console.log(`  Completed in ${((Date.now() - agent2Start) / 1000).toFixed(1)}s\n`);
+  console.log(`  Completed in ${((Date.now() - t2) / 1000).toFixed(1)}s\n`);
 
-  // Agent 3: Multi-model summary
-  console.log('[Step 3/4] Running Agent 3: Multi-Model Summary');
-  const agent3Start = Date.now();
+  // Synthesizer: Multi-model summary
+  console.log('[Step 3/4] Synthesizer Agent: Multi-Model Summary');
+  const t3 = Date.now();
   await summarizeWithMultipleModels();
-  console.log(`  Completed in ${((Date.now() - agent3Start) / 1000).toFixed(1)}s\n`);
+  console.log(`  Completed in ${((Date.now() - t3) / 1000).toFixed(1)}s\n`);
 
-  // Agent 4: Publish
-  console.log('[Step 4/4] Running Agent 4: Publish Results');
-  const agent4Start = Date.now();
+  // Publisher: Email + LinkedIn
+  console.log('[Step 4/4] Publisher Agent: Publishing Results');
+  const t4 = Date.now();
   await publishResults();
-  console.log(`  Completed in ${((Date.now() - agent4Start) / 1000).toFixed(1)}s\n`);
+  console.log(`  Completed in ${((Date.now() - t4) / 1000).toFixed(1)}s\n`);
 
   const totalTime = ((Date.now() - startTime) / 1000).toFixed(1);
   console.log('========================================');

@@ -10,8 +10,8 @@ import { config } from 'dotenv';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 config({ path: path.join(__dirname, '../../.env') });
 
-const INPUT_FILE = path.join(__dirname, '../output/agent3_output.json');
-const OUTPUT_FILE = path.join(__dirname, '../output/agent4_output.json');
+const INPUT_FILE = path.join(__dirname, '../output/synthesizer_output.json');
+const OUTPUT_FILE = path.join(__dirname, '../output/publisher_output.json');
 
 // --- Send Email via Gmail ---
 async function sendEmail(subject, body) {

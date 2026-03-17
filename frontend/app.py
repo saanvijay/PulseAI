@@ -73,28 +73,28 @@ st.sidebar.divider()
 
 col1, col2 = st.sidebar.columns(2)
 with col1:
-    if st.button("Agent 1", use_container_width=True):
-        with st.spinner("Running Agent 1..."):
-            code, out, err = run_node_script(os.path.join(BACKEND_DIR, "agents/agent1_fetch.js"))
+    if st.button("Researcher", use_container_width=True):
+        with st.spinner("Running Researcher Agent..."):
+            code, out, err = run_node_script(os.path.join(BACKEND_DIR, "agents/researcher_agent.js"))
         st.sidebar.success("Done!") if code == 0 else st.sidebar.error(err)
         st.rerun()
 
-    if st.button("Agent 3", use_container_width=True):
-        with st.spinner("Running Agent 3..."):
-            code, out, err = run_node_script(os.path.join(BACKEND_DIR, "agents/agent3_summarize.js"))
+    if st.button("Synthesizer", use_container_width=True):
+        with st.spinner("Running Synthesizer Agent..."):
+            code, out, err = run_node_script(os.path.join(BACKEND_DIR, "agents/synthesizer_agent.js"))
         st.sidebar.success("Done!") if code == 0 else st.sidebar.error(err)
         st.rerun()
 
 with col2:
-    if st.button("Agent 2", use_container_width=True):
-        with st.spinner("Running Agent 2..."):
-            code, out, err = run_node_script(os.path.join(BACKEND_DIR, "agents/agent2_organize.js"))
+    if st.button("Analyst", use_container_width=True):
+        with st.spinner("Running Analyst Agent..."):
+            code, out, err = run_node_script(os.path.join(BACKEND_DIR, "agents/analyst_agent.js"))
         st.sidebar.success("Done!") if code == 0 else st.sidebar.error(err)
         st.rerun()
 
-    if st.button("Agent 4", use_container_width=True):
-        with st.spinner("Running Agent 4..."):
-            code, out, err = run_node_script(os.path.join(BACKEND_DIR, "agents/agent4_publish.js"))
+    if st.button("Publisher", use_container_width=True):
+        with st.spinner("Running Publisher Agent..."):
+            code, out, err = run_node_script(os.path.join(BACKEND_DIR, "agents/publisher_agent.js"))
         st.sidebar.success("Done!") if code == 0 else st.sidebar.error(err)
         st.rerun()
 
@@ -109,10 +109,10 @@ st.title("🤖 PulseAI — Latest AI Updates")
 st.markdown("A 4-agent pipeline that fetches, organizes, summarizes, and publishes the latest AI news.")
 
 tab1, tab2, tab3, tab4 = st.tabs([
-    "📰 Agent 1: Fetch",
-    "📋 Agent 2: Organize",
-    "🧠 Agent 3: Summarize",
-    "📤 Agent 4: Publish",
+    "📰 Researcher Agent",
+    "📋 Analyst Agent",
+    "🧠 Synthesizer Agent",
+    "📤 Publisher Agent",
 ])
 
 

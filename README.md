@@ -48,10 +48,10 @@ Web Sources
 PulseAI/
 ├── backend/
 │   ├── agents/
-│   │   ├── agent1_fetch.js       # Claude web search across 16 sources
-│   │   ├── agent2_organize.js    # Structures content with Claude
-│   │   ├── agent3_summarize.js   # 5 AI models via OpenRouter + final summary
-│   │   └── agent4_publish.js     # Email + LinkedIn publishing
+│   │   ├── researcher_agent.js   # Claude web search across 16 sources
+│   │   ├── analyst_agent.js      # Structures content with Claude
+│   │   ├── synthesizer_agent.js  # 5 AI models via OpenRouter + final summary
+│   │   └── publisher_agent.js    # Email + LinkedIn publishing
 │   ├── output/                   # JSON outputs (created at runtime, gitignored)
 │   ├── orchestrator.js           # Runs all agents in sequence
 │   └── package.json
@@ -136,10 +136,10 @@ cd backend
 node orchestrator.js
 
 # Or run individual agents
-node agents/agent1_fetch.js
-node agents/agent2_organize.js
-node agents/agent3_summarize.js
-node agents/agent4_publish.js
+node agents/researcher_agent.js
+node agents/analyst_agent.js
+node agents/synthesizer_agent.js
+node agents/publisher_agent.js
 ```
 
 ---

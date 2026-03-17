@@ -12,7 +12,7 @@ import { config } from 'dotenv';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 config({ path: path.join(__dirname, '../../.env') });
 
-const OUTPUT_FILE = path.join(__dirname, '../output/agent1_output.json');
+const OUTPUT_FILE = path.join(__dirname, '../output/researcher_output.json');
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 

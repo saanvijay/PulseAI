@@ -5,10 +5,10 @@
   "type": "module",
   "main": "orchestrator.js",
   "scripts": {
-    "agent1": "node agents/agent1_fetch.js",
-    "agent2": "node agents/agent2_organize.js",
-    "agent3": "node agents/agent3_summarize.js",
-    "agent4": "node agents/agent4_publish.js",
+    "researcher": "node agents/researcher_agent.js",
+    "analyst": "node agents/analyst_agent.js",
+    "synthesizer": "node agents/synthesizer_agent.js",
+    "publisher": "node agents/publisher_agent.js",
     "start": "node orchestrator.js"
   },
   "dependencies": {

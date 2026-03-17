@@ -12,8 +12,8 @@ import { config } from 'dotenv';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 config({ path: path.join(__dirname, '../../.env') });
 
-const INPUT_FILE = path.join(__dirname, '../output/agent2_output.json');
-const OUTPUT_FILE = path.join(__dirname, '../output/agent3_output.json');
+const INPUT_FILE = path.join(__dirname, '../output/analyst_output.json');
+const OUTPUT_FILE = path.join(__dirname, '../output/synthesizer_output.json');
 
 // Claude — direct Anthropic SDK
 const claude = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
