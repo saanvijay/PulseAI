@@ -46,21 +46,22 @@ Web Sources
 
 ```
 PulseAI/
-├── agents/
-│   ├── agent1_fetch.js       # Web search via Serper API
-│   ├── agent2_organize.js    # Structures content with Claude
-│   ├── agent3_summarize.js   # Queries 5 AI models + final summary
-│   └── agent4_publish.js     # Email + LinkedIn publishing
-├── output/                   # JSON outputs (created at runtime)
-│   ├── agent1_output.json
-│   ├── agent2_output.json
-│   ├── agent3_output.json
-│   └── agent4_output.json
-├── orchestrator.js           # Runs all agents in sequence
-├── app.py                    # Streamlit dashboard
-├── package.json
-├── pyproject.toml            # Python dependencies (uv)
-└── .env.example              # Copy to .env and fill in API keys
+├── backend/
+│   ├── agents/
+│   │   ├── agent1_fetch.js       # Claude web search across 16 sources
+│   │   ├── agent2_organize.js    # Structures content with Claude
+│   │   ├── agent3_summarize.js   # 5 AI models via OpenRouter + final summary
+│   │   └── agent4_publish.js     # Email + LinkedIn publishing
+│   ├── output/                   # JSON outputs (created at runtime, gitignored)
+│   ├── orchestrator.js           # Runs all agents in sequence
+│   └── package.json
+├── frontend/
+│   ├── app.py                    # Streamlit dashboard
+│   └── pyproject.toml            # Python dependencies (uv)
+├── .env                          # Your API keys (gitignored)
+├── .env.example                  # Template — copy to .env
+├── .gitignore
+└── README.md
 ```
 
 ---
@@ -74,10 +75,10 @@ git clone <your-repo-url>
 cd PulseAI
 
 # Node.js dependencies
-npm install
+cd backend && npm install && cd ..
 
 # Python dependencies (using uv)
-uv sync
+cd frontend && uv sync && cd ..
 ```
 
 > **Install uv** if you don't have it: `curl -LsSf https://astral.sh/uv/install.sh | sh`
@@ -91,9 +92,6 @@ cp .env.example .env
 Open `.env` and fill in your API keys:
 
 ```env
-# Web Search — get free key at https://serper.dev
-SERPER_API_KEY=your_serper_api_key
-
 # AI Models
 ANTHROPIC_API_KEY=your_anthropic_api_key      # platform.anthropic.com
 OPENAI_API_KEY=your_openai_api_key            # platform.openai.com
@@ -123,6 +121,7 @@ LINKEDIN_PERSON_ID=your_linkedin_person_id
 ### Option A — Streamlit Dashboard (recommended)
 
 ```bash
+cd frontend
 uv run streamlit run app.py
 ```
 
@@ -134,6 +133,8 @@ The dashboard gives you:
 ### Option B — Command Line
 
 ```bash
+cd backend
+
 # Run the full pipeline
 node orchestrator.js
 
@@ -197,9 +198,5 @@ LinkedIn requires OAuth 2.0. Here is the one-time setup:
 
 | Key | Where to get it | Free tier |
 |-----|----------------|-----------|
-| `SERPER_API_KEY` | [serper.dev](https://serper.dev) | 2,500 searches/month |
 | `ANTHROPIC_API_KEY` | [platform.anthropic.com](https://platform.anthropic.com) | Pay-as-you-go |
-| `OPENAI_API_KEY` | [platform.openai.com](https://platform.openai.com) | Pay-as-you-go |
-| `GOOGLE_API_KEY` | [aistudio.google.com](https://aistudio.google.com) | Free tier available |
-| `MISTRAL_API_KEY` | [console.mistral.ai](https://console.mistral.ai) | Free tier available |
-| `COHERE_API_KEY` | [dashboard.cohere.com](https://dashboard.cohere.com) | Free tier available |
+| `OPENROUTER_API_KEY` | [openrouter.ai](https://openrouter.ai) | Free tier available — covers GPT-4o, Gemini, Mistral, Cohere |

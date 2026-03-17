@@ -15,8 +15,9 @@ st.set_page_config(
     layout="wide",
 )
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-OUTPUT_DIR = os.path.join(BASE_DIR, "output")
+ROOT_DIR    = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # PulseAI/
+BACKEND_DIR = os.path.join(ROOT_DIR, "backend")
+OUTPUT_DIR  = os.path.join(BACKEND_DIR, "output")
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -36,7 +37,7 @@ def run_node_script(script_path):
         ["node", script_path],
         capture_output=True,
         text=True,
-        cwd=BASE_DIR,
+        cwd=BACKEND_DIR,
     )
     return result.returncode, result.stdout, result.stderr
 
@@ -61,7 +62,7 @@ st.sidebar.subheader("Run Agents")
 
 if st.sidebar.button("🚀 Run Full Pipeline", use_container_width=True, type="primary"):
     with st.spinner("Running full pipeline (this takes a few minutes)..."):
-        code, out, err = run_node_script(os.path.join(BASE_DIR, "orchestrator.js"))
+        code, out, err = run_node_script(os.path.join(BACKEND_DIR, "orchestrator.js"))
     if code == 0:
         st.sidebar.success("Pipeline complete!")
     else:
@@ -74,26 +75,26 @@ col1, col2 = st.sidebar.columns(2)
 with col1:
     if st.button("Agent 1", use_container_width=True):
         with st.spinner("Running Agent 1..."):
-            code, out, err = run_node_script(os.path.join(BASE_DIR, "agents/agent1_fetch.js"))
+            code, out, err = run_node_script(os.path.join(BACKEND_DIR, "agents/agent1_fetch.js"))
         st.sidebar.success("Done!") if code == 0 else st.sidebar.error(err)
         st.rerun()
 
     if st.button("Agent 3", use_container_width=True):
         with st.spinner("Running Agent 3..."):
-            code, out, err = run_node_script(os.path.join(BASE_DIR, "agents/agent3_summarize.js"))
+            code, out, err = run_node_script(os.path.join(BACKEND_DIR, "agents/agent3_summarize.js"))
         st.sidebar.success("Done!") if code == 0 else st.sidebar.error(err)
         st.rerun()
 
 with col2:
     if st.button("Agent 2", use_container_width=True):
         with st.spinner("Running Agent 2..."):
-            code, out, err = run_node_script(os.path.join(BASE_DIR, "agents/agent2_organize.js"))
+            code, out, err = run_node_script(os.path.join(BACKEND_DIR, "agents/agent2_organize.js"))
         st.sidebar.success("Done!") if code == 0 else st.sidebar.error(err)
         st.rerun()
 
     if st.button("Agent 4", use_container_width=True):
         with st.spinner("Running Agent 4..."):
-            code, out, err = run_node_script(os.path.join(BASE_DIR, "agents/agent4_publish.js"))
+            code, out, err = run_node_script(os.path.join(BACKEND_DIR, "agents/agent4_publish.js"))
         st.sidebar.success("Done!") if code == 0 else st.sidebar.error(err)
         st.rerun()
 

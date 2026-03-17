@@ -2,16 +2,19 @@
 .env
 
 # Node
-node_modules/
+backend/node_modules/
 
 # Python
+frontend/.venv/
 .venv/
 __pycache__/
 *.pyc
 
 # Agent outputs (runtime data, not source code)
-output/
+backend/output/
 
 # OS
 .DS_Store
 .claude 
+package-lock.json
+uv.lock

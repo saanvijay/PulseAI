@@ -7,7 +7,7 @@ import { fileURLToPath } from 'url';
 import { config } from 'dotenv';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-config({ path: path.join(__dirname, '../.env') });
+config({ path: path.join(__dirname, '../../.env') });
 
 const INPUT_FILE = path.join(__dirname, '../output/agent1_output.json');
 const OUTPUT_FILE = path.join(__dirname, '../output/agent2_output.json');

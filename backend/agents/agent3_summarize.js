@@ -1,24 +1,44 @@
-// Agent 3: Send the report to 5 AI models and create a final consolidated summary
+// Agent 3: Send the report to 5 AI models and create a final consolidated summary.
+// GPT-4o, Gemini, Mistral, and Cohere are all routed through OpenRouter (one API key).
+// Claude is called directly via the Anthropic SDK.
 
 import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { config } from 'dotenv';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-config({ path: path.join(__dirname, '../.env') });
+config({ path: path.join(__dirname, '../../.env') });
 
 const INPUT_FILE = path.join(__dirname, '../output/agent2_output.json');
 const OUTPUT_FILE = path.join(__dirname, '../output/agent3_output.json');
 
-// Initialize AI clients
+// Claude — direct Anthropic SDK
 const claude = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-const gemini = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+
+// All other models — single OpenRouter client (OpenAI-compatible)
+const openrouter = new OpenAI({
+  apiKey: process.env.OPENROUTER_API_KEY,
+  baseURL: 'https://openrouter.ai/api/v1',
+  defaultHeaders: { 'X-Title': 'PulseAI' },
+});
+
+// Helper: call any model through OpenRouter
+async function askViaOpenRouter(model, report) {
+  const response = await openrouter.chat.completions.create({
+    model,
+    max_tokens: 1000,
+    messages: [
+      {
+        role: 'user',
+        content: `Summarize this AI report in 3-4 key insights:\n\n${report}`,
+      },
+    ],
+  });
+  return response.choices[0].message.content;
+}
 
 // --- Individual model functions ---
 
@@ -36,72 +56,10 @@ async function askClaude(report) {
   return response.content[0].text;
 }
 
-async function askGPT4(report) {
-  const response = await openai.chat.completions.create({
-    model: 'gpt-4o',
-    max_tokens: 1000,
-    messages: [
-      {
-        role: 'user',
-        content: `Summarize this AI report in 3-4 key insights:\n\n${report}`,
-      },
-    ],
-  });
-  return response.choices[0].message.content;
-}
-
-async function askGemini(report) {
-  const model = gemini.getGenerativeModel({ model: 'gemini-1.5-pro' });
-  const result = await model.generateContent(
-    `Summarize this AI report in 3-4 key insights:\n\n${report}`
-  );
-  return result.response.text();
-}
-
-async function askMistral(report) {
-  const response = await axios.post(
-    'https://api.mistral.ai/v1/chat/completions',
-    {
-      model: 'mistral-large-latest',
-      max_tokens: 1000,
-      messages: [
-        {
-          role: 'user',
-          content: `Summarize this AI report in 3-4 key insights:\n\n${report}`,
-        },
-      ],
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${process.env.MISTRAL_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-    }
-  );
-  return response.data.choices[0].message.content;
-}
-
-async function askCohere(report) {
-  const response = await axios.post(
-    'https://api.cohere.com/v2/chat',
-    {
-      model: 'command-r-plus',
-      messages: [
-        {
-          role: 'user',
-          content: `Summarize this AI report in 3-4 key insights:\n\n${report}`,
-        },
-      ],
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${process.env.COHERE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-    }
-  );
-  return response.data.message.content[0].text;
-}
+async function askGPT4(report)    { return askViaOpenRouter('openai/gpt-4o', report); }
+async function askGemini(report)  { return askViaOpenRouter('google/gemini-pro-1.5', report); }
+async function askMistral(report) { return askViaOpenRouter('mistralai/mistral-large', report); }
+async function askCohere(report)  { return askViaOpenRouter('cohere/command-r-plus', report); }
 
 // --- Helper to safely call each model ---
 async function callModel(name, fn, report) {
