@@ -8,6 +8,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { config } from 'dotenv';
+import { SOURCES } from '../config/sources.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 config({ path: path.join(__dirname, '../../.env') });
@@ -16,46 +17,19 @@ const OUTPUT_FILE = path.join(__dirname, '../output/researcher_output.json');
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-// All sources to search, grouped by category
-const SOURCES = {
-  research: [
-    { query: 'site:arxiv.org/abs AI machine learning 2026',         label: 'ArXiv' },
-    { query: 'site:paperswithcode.com latest AI state of the art',  label: 'Papers with Code' },
-  ],
-  lab_blogs: [
-    { query: 'site:anthropic.com/research latest 2026',             label: 'Anthropic Research' },
-    { query: 'site:openai.com/blog latest 2026',                    label: 'OpenAI Blog' },
-    { query: 'site:deepmind.google/research latest 2026',           label: 'Google DeepMind' },
-    { query: 'site:ai.meta.com/blog latest 2026',                   label: 'Meta AI Blog' },
-    { query: 'site:mistral.ai/news 2026',                           label: 'Mistral' },
-    { query: 'site:huggingface.co/blog 2026',                       label: 'Hugging Face Blog' },
-  ],
-  newsletters: [
-    { query: 'site:deeplearning.ai/the-batch 2026',                 label: 'The Batch' },
-    { query: '"Import AI" Jack Clark newsletter 2026',              label: 'Import AI' },
-  ],
-  news: [
-    { query: 'site:venturebeat.com AI 2026',                        label: 'VentureBeat' },
-    { query: 'site:techcrunch.com artificial-intelligence 2026',    label: 'TechCrunch AI' },
-    { query: 'site:wired.com artificial-intelligence 2026',         label: 'Wired AI' },
-  ],
-  community: [
-    { query: 'site:reddit.com/r/MachineLearning top posts 2026',   label: 'Reddit r/MachineLearning' },
-    { query: 'site:reddit.com/r/LocalLLaMA top posts 2026',        label: 'Reddit r/LocalLLaMA' },
-    { query: 'site:linkedin.com/pulse AI artificial intelligence 2026', label: 'LinkedIn' },
-    { query: 'AI breakthroughs twitter x.com 2026',                label: 'X/Twitter' },
-  ],
-};
-
-// Flat list of all searches with their category tag
+// Flat list of all active (uncommented) sources with their category tag
 const ALL_SEARCHES = Object.entries(SOURCES).flatMap(([category, items]) =>
   items.map((s) => ({ ...s, category }))
 );
 
-// Claude will use this prompt to autonomously search all sources
-const SEARCH_PROMPT = `You are an AI research assistant. Use the web search tool to find the latest AI developments.
+function buildSearchPrompt(topic) {
+  const topicLine = topic
+    ? `Focus specifically on: "${topic}"\n\n`
+    : '';
 
-Run a separate web search for EACH of the following ${ALL_SEARCHES.length} queries (search them all):
+  return `You are an AI research assistant. Use the web search tool to find the latest AI developments.
+
+${topicLine}Run a separate web search for EACH of the following ${ALL_SEARCHES.length} queries (search them all):
 
 ${ALL_SEARCHES.map((s, i) => `${i + 1}. "${s.query}" — ${s.label}`).join('\n')}
 
@@ -73,12 +47,14 @@ After completing all searches, compile every result into a single JSON array. Re
 ]
 
 Aim for at least 2-3 results per source. Total should be 25-30 results.`;
+}
 
-async function fetchLatestAIConcepts() {
+async function fetchLatestAIConcepts(topic = '') {
   const sourceNames = ALL_SEARCHES.map((s) => s.label).join(', ');
   console.log(`Agent 1: Searching ${ALL_SEARCHES.length} sources — ${sourceNames}`);
+  if (topic) console.log(`  Topic: "${topic}"`);
 
-  const messages = [{ role: 'user', content: SEARCH_PROMPT }];
+  const messages = [{ role: 'user', content: buildSearchPrompt(topic) }];
   let finalText = '';
 
   // Loop handles pause_turn — triggered when Claude's server-side search
@@ -135,6 +111,7 @@ async function fetchLatestAIConcepts() {
 
   const output = {
     timestamp: new Date().toISOString(),
+    topic: topic || 'Latest AI updates',
     total: articles.length,
     sources_searched: ALL_SEARCHES.map((s) => s.label),
     articles,
@@ -146,9 +123,10 @@ async function fetchLatestAIConcepts() {
   return output;
 }
 
-// Run when called directly
+// Run when called directly: node researcher_agent.js "optional topic"
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  fetchLatestAIConcepts()
+  const topic = process.argv[2] || '';
+  fetchLatestAIConcepts(topic)
     .then(() => process.exit(0))
     .catch((err) => {
       console.error('Agent 1 Error:', err.message);

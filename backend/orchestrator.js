@@ -5,9 +5,10 @@ import { organizeContent }       from './agents/analyst_agent.js';
 import { summarizeWithMultipleModels } from './agents/synthesizer_agent.js';
 import { publishResults }        from './agents/publisher_agent.js';
 
-async function runPipeline() {
+async function runPipeline(topic = '') {
   console.log('\n========================================');
   console.log('  PulseAI - Multi-Agent Pipeline');
+  if (topic) console.log(`  Topic: ${topic}`);
   console.log('========================================\n');
 
   const startTime = Date.now();
@@ -15,7 +16,7 @@ async function runPipeline() {
   // Researcher: Fetch AI news from 16 sources
   console.log('\n[Step 1/4] Researcher Agent: Fetching AI News');
   const t1 = Date.now();
-  await fetchLatestAIConcepts();
+  await fetchLatestAIConcepts(topic);
   console.log(`  Completed in ${((Date.now() - t1) / 1000).toFixed(1)}s\n`);
 
   // Analyst: Organize into structured report
@@ -43,7 +44,8 @@ async function runPipeline() {
   console.log('========================================\n');
 }
 
-runPipeline().catch((err) => {
+const topic = process.argv[2] || '';
+runPipeline(topic).catch((err) => {
   console.error('\nPipeline failed:', err.message);
   process.exit(1);
 });
