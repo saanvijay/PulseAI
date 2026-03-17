@@ -1,0 +1,18 @@
+# Web Search
+SERPER_API_KEY=your_serper_api_key
+
+# AI Models
+ANTHROPIC_API_KEY=your_anthropic_api_key
+OPENAI_API_KEY=your_openai_api_key
+GOOGLE_API_KEY=your_google_gemini_api_key
+MISTRAL_API_KEY=your_mistral_api_key
+COHERE_API_KEY=your_cohere_api_key
+
+# Email (use Gmail App Password, not your real password)
+EMAIL_USER=your_email@gmail.com
+EMAIL_PASS=your_gmail_app_password
+EMAIL_TO=recipient@example.com
+
+# LinkedIn (get from LinkedIn Developer Portal)
+LINKEDIN_ACCESS_TOKEN=your_linkedin_access_token
+LINKEDIN_PERSON_ID=your_linkedin_person_id
