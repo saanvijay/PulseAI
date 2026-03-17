@@ -5,6 +5,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { config } from 'dotenv';
+import { TOKENS } from '../config/tokens.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 config({ path: path.join(__dirname, '../../.env') });
@@ -68,7 +69,7 @@ Keep each section concise but informative. Use bullet points where appropriate.`
 
   const message = await client.messages.create({
     model: 'claude-opus-4-6',
-    max_tokens: 4000,
+    max_tokens: TOKENS.analyst,
     messages: [{ role: 'user', content: prompt }],
   });
 

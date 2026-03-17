@@ -8,6 +8,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { config } from 'dotenv';
+import { TOKENS } from '../config/tokens.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 config({ path: path.join(__dirname, '../../.env') });
@@ -29,7 +30,7 @@ const openrouter = new OpenAI({
 async function askViaOpenRouter(model, report) {
   const response = await openrouter.chat.completions.create({
     model,
-    max_tokens: 1000,
+    max_tokens: TOKENS.synthesizer_per_model,
     messages: [
       {
         role: 'user',
@@ -45,7 +46,7 @@ async function askViaOpenRouter(model, report) {
 async function askClaude(report) {
   const response = await claude.messages.create({
     model: 'claude-opus-4-6',
-    max_tokens: 1000,
+    max_tokens: TOKENS.synthesizer_per_model,
     messages: [
       {
         role: 'user',
@@ -99,7 +100,7 @@ Write a final summary that:
 
   const response = await claude.messages.create({
     model: 'claude-opus-4-6',
-    max_tokens: 1000,
+    max_tokens: TOKENS.synthesizer_final,
     messages: [{ role: 'user', content: prompt }],
   });
 

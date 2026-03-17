@@ -9,6 +9,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { config } from 'dotenv';
 import { SOURCES } from '../config/sources.js';
+import { TOKENS } from '../config/tokens.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 config({ path: path.join(__dirname, '../../.env') });
@@ -62,7 +63,7 @@ async function fetchLatestAIConcepts(topic = '') {
   for (let iteration = 0; iteration < 5; iteration++) {
     const response = await client.messages.create({
       model: 'claude-opus-4-6',
-      max_tokens: 8000,
+      max_tokens: TOKENS.researcher,
       tools: [
         { type: 'web_search_20260209', name: 'web_search' },
       ],
