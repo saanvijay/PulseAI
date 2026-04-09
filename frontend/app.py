@@ -26,6 +26,8 @@ OUTPUT_DIR  = os.path.join(BACKEND_DIR, "output")
 
 if "topic" not in st.session_state:
     st.session_state.topic = ""
+if "trend_topics" not in st.session_state:
+    st.session_state.trend_topics = []
 
 
 # ── Shared agent state (cache_resource = safe for background threads) ─────────
@@ -47,10 +49,11 @@ def load_json(filename):
 
 def _agent_thread(agent_name, script_path, extra_args=()):
     state = get_agent_state()
-    cmd   = [sys.executable, script_path, *extra_args]
+    cmd   = [sys.executable, "-u", script_path, *extra_args]
     proc  = subprocess.Popen(
         cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
         text=True, bufsize=1, cwd=BACKEND_DIR,
+        env={**os.environ, "PYTHONUNBUFFERED": "1"},
     )
     state["process"] = proc
     for raw in iter(proc.stdout.readline, ""):
@@ -140,10 +143,20 @@ with left:
     topic = st.session_state.topic
 
     if st.button("🔍 Trend Agent — Auto-detect Topic", use_container_width=True, disabled=busy):
-        if topic.strip():
-            st.info("Topic already set. Clear the box to auto-detect.")
-        else:
-            launch_agent("Trend Agent", os.path.join(BACKEND_DIR, "agents/trend_agent.py"))
+        st.session_state.trend_topics = []
+        launch_agent("Trend Agent", os.path.join(BACKEND_DIR, "agents/trend_agent.py"))
+        st.rerun()
+
+    if st.session_state.trend_topics:
+        st.markdown("**Select a trending topic:**")
+        chosen = st.radio(
+            "trending_radio",
+            st.session_state.trend_topics,
+            label_visibility="collapsed",
+        )
+        if st.button("Use this topic", use_container_width=True):
+            st.session_state.topic = chosen
+            st.session_state.trend_topics = []
             st.rerun()
 
     st.divider()
@@ -225,8 +238,8 @@ with right:
     elif done:
         if not st.session_state.topic.strip():
             trend = load_json("trend_output.json")
-            if trend and trend.get("topic"):
-                st.session_state.topic = trend["topic"]
+            if trend and trend.get("topics"):
+                st.session_state.trend_topics = trend["topics"]
         state["done"] = False
         time.sleep(0.3)
         st.rerun()

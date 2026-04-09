@@ -1,11 +1,16 @@
-# Agent 1: Fetch the latest AI news using Google News RSS, then use
+# Agent 1: Fetch the latest AI news using Google News RSS (parallel), then use
 # a local Ollama model (via CrewAI) to organize results into structured JSON.
+# Searches active sources in parallel batches of 3. If a batch yields too few
+# articles, randomly picks 3 more from inactive sources and retries.
 
 import json
 import os
+import random
+import re
 import sys
 import urllib.parse
 import xml.etree.ElementTree as ET
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 
@@ -28,66 +33,158 @@ CONFIG_DIR = BASE_DIR.parent / "config"
 SOURCES = json.loads((CONFIG_DIR / "sources.json").read_text())
 TOKENS  = json.loads((CONFIG_DIR / "tokens.json").read_text())
 
-ALL_SEARCHES = [
-    {"query": s["query"], "label": s["label"], "category": cat}
+# All sources as a label → object lookup (active and inactive)
+ALL_SOURCES_BY_LABEL = {
+    s["label"]: {"query": s["query"], "label": s["label"], "category": cat}
+    for cat, items in SOURCES.items()
+    for s in items
+}
+
+ACTIVE_SOURCES = [
+    ALL_SOURCES_BY_LABEL[s["label"]]
     for cat, items in SOURCES.items()
     for s in items
     if s.get("enabled", True)
 ]
+
+# Minimum articles per batch before triggering fallback
+MIN_ARTICLES_PER_BATCH = 3
+
+TREND_OUTPUT = BASE_DIR / "output" / "trend_output.json"
+
+def get_trend_sources() -> tuple[list[dict], list[dict]]:
+    """
+    Return (primary, fallback) source lists.
+    If trend_output.json exists, primary = sources the trend agent used.
+    Otherwise, primary = active sources from sources.json.
+    Fallback = everything not in primary.
+    """
+    if TREND_OUTPUT.exists():
+        try:
+            trend = json.loads(TREND_OUTPUT.read_text())
+            scanned_labels = trend.get("sources_scanned", [])
+            if scanned_labels:
+                primary  = [ALL_SOURCES_BY_LABEL[l] for l in scanned_labels if l in ALL_SOURCES_BY_LABEL]
+                used     = set(scanned_labels)
+                fallback = [s for s in ALL_SOURCES_BY_LABEL.values() if s["label"] not in used]
+                print(f"  Using trend agent sources: {', '.join(scanned_labels)}")
+                return primary, fallback
+        except Exception as e:
+            print(f"  Could not read trend_output.json ({e}), using active sources.")
+    return ACTIVE_SOURCES, [
+        s for s in ALL_SOURCES_BY_LABEL.values()
+        if s["label"] not in {a["label"] for a in ACTIVE_SOURCES}
+    ]
 
 # ── Google News RSS helper ────────────────────────────────────────────────────
 
 _GNEWS_RSS = "https://news.google.com/rss/search"
 _HEADERS   = {"User-Agent": "Mozilla/5.0"}
 
-def gnews_search(query: str, max_results: int = 5) -> list[dict]:
+def gnews_search(source: dict, topic: str = "", max_results: int = 5) -> tuple[dict, list[dict]]:
+    """Fetch articles for one source. Returns (source, articles) for use in futures."""
+    query = f"{topic} {source['query']}" if topic else source["query"]
     try:
         url  = f"{_GNEWS_RSS}?q={urllib.parse.quote(query)}&hl=en-US&gl=US&ceid=US:en"
         resp = requests.get(url, headers=_HEADERS, timeout=15)
         resp.raise_for_status()
         root  = ET.fromstring(resp.content)
         items = root.findall(".//item")[:max_results]
-        results = []
+        articles = []
         for item in items:
-            # Strip HTML tags from description
             desc = item.findtext("description", "")
             desc = ET.fromstring(f"<d>{desc}</d>").text if desc.startswith("<") else desc
-            results.append({
-                "title": item.findtext("title", ""),
-                "body":  desc,
-                "url":   item.findtext("link", ""),
-                "date":  item.findtext("pubDate", ""),
+            articles.append({
+                "title":    item.findtext("title", ""),
+                "snippet":  desc or "",
+                "link":     item.findtext("link", ""),
+                "source":   source["label"],
+                "category": source["category"],
+                "date":     item.findtext("pubDate", ""),
             })
-        return results
+        return source, articles
     except Exception as e:
-        print(f"  Google News search failed for '{query}': {e}")
-        return []
+        print(f"  [ERROR]     {source['label']}: {e}")
+        return source, []
+
+# ── Parallel batch search ─────────────────────────────────────────────────────
+
+def search_batch_parallel(sources: list[dict], topic: str = "", max_results: int = 5) -> list[dict]:
+    """Search a list of sources in parallel, logging each start and completion."""
+    all_articles = []
+    print(f"  Launching {len(sources)} parallel searches...", flush=True)
+
+    with ThreadPoolExecutor(max_workers=len(sources)) as executor:
+        futures = {}
+        for source in sources:
+            print(f"  [SEARCHING] {source['label']}...", flush=True)
+            futures[executor.submit(gnews_search, source, topic, max_results)] = source["label"]
+
+        for future in as_completed(futures):
+            source, articles = future.result()
+            count = len(articles)
+            print(f"  [DONE]      {source['label']} — {count} article{'s' if count != 1 else ''} found", flush=True)
+            all_articles.extend(articles)
+
+    return all_articles
 
 # ── Main agent function ────────────────────────────────────────────────────────
 
 def fetch_latest_ai_concepts(topic: str = "") -> dict:
-    source_names = ", ".join(s["label"] for s in ALL_SEARCHES)
-    print(f"Agent 1: Searching {len(ALL_SEARCHES)} sources — {source_names}")
+    primary_sources, fallback_sources = get_trend_sources()
+
+    print(f"Agent 1: Starting research across {len(primary_sources)} primary sources", flush=True)
     if topic:
-        print(f"  Topic: \"{topic}\"")
+        print(f"  Topic: \"{topic}\"", flush=True)
 
-    # Step 1: Search all sources with Google News RSS
-    raw_articles = []
-    for source in ALL_SEARCHES:
-        query = f"{topic} {source['query']}" if topic else source["query"]
-        print(f"  Searching: \"{source['label']}\"")
-        results = gnews_search(query, max_results=5)
-        for r in results:
-            raw_articles.append({
-                "title":    r.get("title", ""),
-                "snippet":  r.get("body", ""),
-                "link":     r.get("url", ""),
-                "source":   source["label"],
-                "category": source["category"],
-                "date":     r.get("date"),
-            })
+    remaining_fallbacks = fallback_sources.copy()
+    random.shuffle(remaining_fallbacks)
 
-    print(f"  Raw results: {len(raw_articles)} articles collected. Organizing with Ollama...")
+    raw_articles  = []
+    sources_used  = []
+    batch_num     = 0
+
+    # Split primary sources into batches of 3 and search each batch
+    active_batches = [primary_sources[i:i+3] for i in range(0, len(primary_sources), 3)]
+
+    for batch in active_batches:
+        batch_num += 1
+        batch_names = [s["label"] for s in batch]
+        print(f"\n  Batch {batch_num} (primary): {', '.join(batch_names)}", flush=True)
+
+        batch_articles = search_batch_parallel(batch, topic)
+        raw_articles.extend(batch_articles)
+        sources_used.extend(batch_names)
+        print(f"  Batch {batch_num} total: {len(batch_articles)} articles | Running total: {len(raw_articles)}", flush=True)
+
+        # If this batch was too thin, queue a fallback batch immediately after
+        if len(batch_articles) < MIN_ARTICLES_PER_BATCH and remaining_fallbacks:
+            fallback_batch = remaining_fallbacks[:3]
+            remaining_fallbacks = remaining_fallbacks[3:]
+            fb_names = [s["label"] for s in fallback_batch]
+            print(f"\n  Batch {batch_num} returned only {len(batch_articles)} articles — "
+                  f"trying fallback: {', '.join(fb_names)}")
+            batch_num += 1
+            fb_articles = search_batch_parallel(fallback_batch, topic)
+            raw_articles.extend(fb_articles)
+            sources_used.extend(fb_names)
+            print(f"  Fallback batch total: {len(fb_articles)} articles | Running total: {len(raw_articles)}")
+
+    # If still very few results, drain remaining fallbacks in batches of 3
+    while len(raw_articles) < MIN_ARTICLES_PER_BATCH and remaining_fallbacks:
+        fallback_batch = remaining_fallbacks[:3]
+        remaining_fallbacks = remaining_fallbacks[3:]
+        fb_names = [s["label"] for s in fallback_batch]
+        batch_num += 1
+        print(f"\n  Still only {len(raw_articles)} articles total — "
+              f"trying next fallback batch: {', '.join(fb_names)}")
+        fb_articles = search_batch_parallel(fallback_batch, topic)
+        raw_articles.extend(fb_articles)
+        sources_used.extend(fb_names)
+        print(f"  Batch total: {len(fb_articles)} articles | Running total: {len(raw_articles)}")
+
+    print(f"\n  Raw results: {len(raw_articles)} articles collected across {len(sources_used)} sources.")
+    print("  Organizing with Ollama...")
 
     # Step 2: Use CrewAI + Ollama to filter and structure results
     llm = LLM(model=f"ollama/{OLLAMA_MODEL}", base_url=OLLAMA_BASE_URL)
@@ -131,14 +228,14 @@ Return ONLY a raw JSON array — no explanation, no markdown fences:
         agent=analyst,
     )
 
-    crew   = Crew(agents=[analyst], tasks=[task], verbose=False)
-    result = crew.kickoff()
+    crew        = Crew(agents=[analyst], tasks=[task], verbose=False)
+    result      = crew.kickoff()
     output_text = str(result)
 
     # Parse JSON from agent output
     articles = []
     try:
-        json_match = __import__("re").search(r"\[[\s\S]*\]", output_text)
+        json_match = re.search(r"\[[\s\S]*\]", output_text)
         if json_match:
             articles = json.loads(json_match.group())
         else:
@@ -151,13 +248,13 @@ Return ONLY a raw JSON array — no explanation, no markdown fences:
         "timestamp":        datetime.utcnow().isoformat(),
         "topic":            topic or "Latest AI updates",
         "total":            len(articles),
-        "sources_searched": [s["label"] for s in ALL_SEARCHES],
+        "sources_searched": sources_used,
         "articles":         articles,
     }
 
     OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT_FILE.write_text(json.dumps(output, indent=2))
-    print(f"Agent 1: Done! Found {len(articles)} results across {len(ALL_SEARCHES)} sources.")
+    print(f"Agent 1: Done! Found {len(articles)} articles across {len(sources_used)} sources.")
     return output
 
 
