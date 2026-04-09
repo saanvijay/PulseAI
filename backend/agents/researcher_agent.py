@@ -23,15 +23,16 @@ OUTPUT_FILE = BASE_DIR / "output" / "researcher_output.json"
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 OLLAMA_MODEL    = os.getenv("OLLAMA_MODEL", "llama3.2")
 
-# Add parent to path so config imports work when run directly
-sys.path.insert(0, str(BASE_DIR))
-from config.sources import SOURCES
-from config.tokens import TOKENS
+CONFIG_DIR = BASE_DIR.parent / "config"
+
+SOURCES = json.loads((CONFIG_DIR / "sources.json").read_text())
+TOKENS  = json.loads((CONFIG_DIR / "tokens.json").read_text())
 
 ALL_SEARCHES = [
     {"query": s["query"], "label": s["label"], "category": cat}
     for cat, items in SOURCES.items()
     for s in items
+    if s.get("enabled", True)
 ]
 
 # ── Google News RSS helper ────────────────────────────────────────────────────

@@ -7,12 +7,12 @@ A multi-agent system that automatically fetches, organizes, summarizes, and publ
 ## How It Works
 
 ```
-Web Sources (DuckDuckGo)
+Web Sources (Google News RSS)
          │
          ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │  Agent 1: Researcher                                            │
-│  Searches the web via DuckDuckGo across configured AI sources   │
+│  Searches the web via Google News RSS across configured sources │
 │  → Ollama organizes results into structured articles JSON       │
 └───────────────────────────┬─────────────────────────────────────┘
                             │ researcher_output.json
@@ -45,16 +45,16 @@ Web Sources (DuckDuckGo)
 
 ```
 PulseAI/
+├── config/
+│   ├── sources.json              # Search sources — set "enabled": true/false to toggle
+│   └── tokens.json               # Ollama context/token limits per agent
 ├── backend/
 │   ├── agents/
-│   │   ├── researcher_agent.py   # DuckDuckGo search + Ollama curation
+│   │   ├── researcher_agent.py   # Google News RSS + Ollama curation
 │   │   ├── analyst_agent.py      # CrewAI + Ollama 8-section report
 │   │   ├── synthesizer_agent.py  # 5 local Ollama models + consolidation
 │   │   ├── publisher_agent.py    # Email (smtplib) + LinkedIn API
-│   │   └── trend_agent.py        # DuckDuckGo + Ollama trend detection
-│   ├── config/
-│   │   ├── sources.py            # Search sources (uncomment to add more)
-│   │   └── tokens.py             # Ollama context/token limits
+│   │   └── trend_agent.py        # Google News RSS + Ollama trend detection
 │   ├── output/                   # JSON outputs (created at runtime, gitignored)
 │   ├── tests/
 │   │   ├── conftest.py           # Shared pytest fixtures
@@ -230,36 +230,36 @@ uv run pytest ../backend/tests/test_integration.py -v
 
 | File | Tests | Coverage |
 |------|-------|----------|
-| `test_researcher_agent.py` | 9 | DDG search, article curation, topic injection, JSON fallback, file output |
+| `test_researcher_agent.py` | 9 | Google News search, article curation, topic injection, JSON fallback, file output |
 | `test_analyst_agent.py` | 6 | Report schema, article count, file output, missing input error |
 | `test_synthesizer_agent.py` | 13 | Ollama HTTP calls, per-model success/error, final consolidation, model counts |
 | `test_publisher_agent.py` | 12 | LinkedIn post formatting, SMTP email, API calls, env var gating, error handling |
-| `test_trend_agent.py` | 9 | DDG search, topic extraction, quote stripping, empty results, file output |
+| `test_trend_agent.py` | 9 | Google News search, topic extraction, quote stripping, empty results, file output |
 | `test_integration.py` | 8 | Full pipeline sequence, inter-agent data flow, output schemas, topic arg, credentials, dependency chain |
 
 ---
 
 ## Configuring Sources
 
-By default, 3 sources are active. Open [backend/config/sources.py](backend/config/sources.py) and uncomment any sources you want to add:
+Open [config/sources.json](config/sources.json) and set `"enabled": true` for any sources you want to activate. By default, 3 sources are enabled:
 
-```python
-SOURCES = {
-    "research": [
-        # {"query": "site:arxiv.org/abs AI machine learning 2026", "label": "ArXiv"},
-    ],
-    "lab_blogs": [
-        {"query": "Anthropic research latest AI 2026",  "label": "Anthropic Research"},  # ✅ active
-        {"query": "OpenAI blog latest news 2026",       "label": "OpenAI Blog"},          # ✅ active
-        {"query": "Google DeepMind research 2026",      "label": "Google DeepMind"},      # ✅ active
-        # {"query": "Meta AI blog latest 2026",         "label": "Meta AI Blog"},
-        ...
-    ],
+```json
+{
+  "lab_blogs": [
+    {"query": "Anthropic research latest AI 2026", "label": "Anthropic Research", "enabled": true},
+    {"query": "OpenAI blog latest news 2026",      "label": "OpenAI Blog",        "enabled": true},
+    {"query": "Google DeepMind research 2026",     "label": "Google DeepMind",    "enabled": true},
+    {"query": "Meta AI blog latest 2026",          "label": "Meta AI Blog",       "enabled": false},
     ...
+  ],
+  "research": [
+    {"query": "site:arxiv.org/abs AI machine learning 2026", "label": "ArXiv", "enabled": false},
+    ...
+  ]
 }
 ```
 
-Each active source triggers one DuckDuckGo search call.
+Each enabled source triggers one Google News RSS fetch. To adjust token/context limits per agent, edit [config/tokens.json](config/tokens.json).
 
 ---
 
@@ -319,7 +319,7 @@ LinkedIn requires a one-time OAuth 2.0 setup:
 |-------|-----------|
 | Agent framework | Python + CrewAI |
 | Local LLMs | Ollama (llama3.2, mistral, qwen2.5, phi3, gemma2) |
-| Web search | DuckDuckGo (no API key required) |
+| Web search | Google News RSS (no API key required) |
 | Dashboard | Streamlit (managed with uv) |
 | Email | Python smtplib (Gmail) |
 | Social | LinkedIn UGC Posts API v2 |

@@ -7,7 +7,6 @@
 
 import json
 import os
-import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -26,8 +25,7 @@ OUTPUT_FILE = BASE_DIR / "output" / "synthesizer_output.json"
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 PRIMARY_MODEL   = os.getenv("OLLAMA_MODEL", "llama3.2")
 
-sys.path.insert(0, str(BASE_DIR))
-from config.tokens import TOKENS
+TOKENS = json.loads((BASE_DIR.parent / "config" / "tokens.json").read_text())
 
 # Models to query in parallel — add/remove based on what you have pulled locally
 OLLAMA_MODELS = [

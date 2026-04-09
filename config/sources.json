@@ -1,0 +1,29 @@
+{
+  "research": [
+    {"query": "site:arxiv.org/abs AI machine learning 2026", "label": "ArXiv", "enabled": false},
+    {"query": "site:paperswithcode.com latest AI state of the art", "label": "Papers with Code", "enabled": false}
+  ],
+  "lab_blogs": [
+    {"query": "Anthropic research latest AI 2026", "label": "Anthropic Research", "enabled": true},
+    {"query": "OpenAI blog latest news 2026", "label": "OpenAI Blog", "enabled": true},
+    {"query": "Google DeepMind research 2026", "label": "Google DeepMind", "enabled": true},
+    {"query": "Meta AI blog latest 2026", "label": "Meta AI Blog", "enabled": false},
+    {"query": "Mistral AI news 2026", "label": "Mistral", "enabled": false},
+    {"query": "Hugging Face blog 2026", "label": "Hugging Face Blog", "enabled": false}
+  ],
+  "newsletters": [
+    {"query": "DeepLearning.AI The Batch newsletter 2026", "label": "The Batch", "enabled": false},
+    {"query": "Import AI Jack Clark newsletter 2026", "label": "Import AI", "enabled": false}
+  ],
+  "news": [
+    {"query": "site:venturebeat.com AI news 2026", "label": "VentureBeat", "enabled": false},
+    {"query": "site:techcrunch.com artificial intelligence 2026", "label": "TechCrunch AI", "enabled": false},
+    {"query": "site:wired.com artificial intelligence 2026", "label": "Wired AI", "enabled": false}
+  ],
+  "community": [
+    {"query": "reddit MachineLearning top posts 2026", "label": "Reddit r/MachineLearning", "enabled": false},
+    {"query": "reddit LocalLLaMA top posts 2026", "label": "Reddit r/LocalLLaMA", "enabled": false},
+    {"query": "LinkedIn AI artificial intelligence pulse 2026", "label": "LinkedIn", "enabled": false},
+    {"query": "AI breakthroughs twitter 2026", "label": "X/Twitter", "enabled": false}
+  ]
+}
