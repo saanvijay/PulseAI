@@ -1,14 +1,16 @@
-# Agent 1: Fetch the latest AI news using DuckDuckGo search, then use
+# Agent 1: Fetch the latest AI news using Google News RSS, then use
 # a local Ollama model (via CrewAI) to organize results into structured JSON.
 
 import json
 import os
 import sys
+import urllib.parse
+import xml.etree.ElementTree as ET
 from datetime import datetime
 from pathlib import Path
 
+import requests
 from crewai import Agent, Crew, LLM, Task
-from duckduckgo_search import DDGS
 from dotenv import load_dotenv
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
@@ -32,14 +34,32 @@ ALL_SEARCHES = [
     for s in items
 ]
 
-# ── DuckDuckGo helper ─────────────────────────────────────────────────────────
+# ── Google News RSS helper ────────────────────────────────────────────────────
 
-def ddg_search(query: str, max_results: int = 5) -> list[dict]:
+_GNEWS_RSS = "https://news.google.com/rss/search"
+_HEADERS   = {"User-Agent": "Mozilla/5.0"}
+
+def gnews_search(query: str, max_results: int = 5) -> list[dict]:
     try:
-        with DDGS() as ddgs:
-            return list(ddgs.text(query, max_results=max_results))
+        url  = f"{_GNEWS_RSS}?q={urllib.parse.quote(query)}&hl=en-US&gl=US&ceid=US:en"
+        resp = requests.get(url, headers=_HEADERS, timeout=15)
+        resp.raise_for_status()
+        root  = ET.fromstring(resp.content)
+        items = root.findall(".//item")[:max_results]
+        results = []
+        for item in items:
+            # Strip HTML tags from description
+            desc = item.findtext("description", "")
+            desc = ET.fromstring(f"<d>{desc}</d>").text if desc.startswith("<") else desc
+            results.append({
+                "title": item.findtext("title", ""),
+                "body":  desc,
+                "url":   item.findtext("link", ""),
+                "date":  item.findtext("pubDate", ""),
+            })
+        return results
     except Exception as e:
-        print(f"  DDG search failed for '{query}': {e}")
+        print(f"  Google News search failed for '{query}': {e}")
         return []
 
 # ── Main agent function ────────────────────────────────────────────────────────
@@ -50,20 +70,20 @@ def fetch_latest_ai_concepts(topic: str = "") -> dict:
     if topic:
         print(f"  Topic: \"{topic}\"")
 
-    # Step 1: Search all sources with DuckDuckGo
+    # Step 1: Search all sources with Google News RSS
     raw_articles = []
     for source in ALL_SEARCHES:
         query = f"{topic} {source['query']}" if topic else source["query"]
         print(f"  Searching: \"{source['label']}\"")
-        results = ddg_search(query, max_results=5)
+        results = gnews_search(query, max_results=5)
         for r in results:
             raw_articles.append({
                 "title":    r.get("title", ""),
                 "snippet":  r.get("body", ""),
-                "link":     r.get("href", ""),
+                "link":     r.get("url", ""),
                 "source":   source["label"],
                 "category": source["category"],
-                "date":     None,
+                "date":     r.get("date"),
             })
 
     print(f"  Raw results: {len(raw_articles)} articles collected. Organizing with Ollama...")
@@ -81,13 +101,15 @@ def fetch_latest_ai_concepts(topic: str = "") -> dict:
     analyst = Agent(
         role="AI News Curator",
         goal="Select and organize the most relevant AI news articles into structured JSON",
-        backstory="You are a senior AI research curator who selects the most informative and unique articles.",
+        backstory="You are a senior AI research curator who selects the most informative and unique articles. You ALWAYS respond in English only.",
         llm=llm,
         verbose=False,
     )
 
     task = Task(
-        description=f"""{topic_line}From the raw search results below, select the best 20-25 unique and informative articles.
+        description=f"""IMPORTANT: Respond in English only. Do not use any other language.
+
+{topic_line}From the raw search results below, select the best 20-25 unique and informative articles.
 Remove duplicates and low-quality results.
 
 RAW RESULTS:
@@ -121,7 +143,7 @@ Return ONLY a raw JSON array — no explanation, no markdown fences:
         else:
             raise ValueError("No JSON array found in agent output")
     except Exception as err:
-        print(f"  Could not parse agent JSON ({err}), using raw DDG results.")
+        print(f"  Could not parse agent JSON ({err}), using raw results.")
         articles = raw_articles
 
     output = {

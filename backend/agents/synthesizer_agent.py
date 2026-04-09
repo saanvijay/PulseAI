@@ -59,7 +59,7 @@ def ask_ollama(model: str, prompt: str, max_tokens: int = 1024) -> str:
 def call_model(name: str, model: str, report: str) -> dict:
     try:
         print(f"  Asking {name}...")
-        prompt  = f"Summarize this AI report in 3-4 key insights:\n\n{report}"
+        prompt  = f"IMPORTANT: Respond in English only. Do not use any other language.\n\nSummarize this AI report in 3-4 key insights:\n\n{report}"
         summary = ask_ollama(model, prompt, TOKENS["synthesizer_per_model"])
         return {"model": name, "status": "success", "summary": summary}
     except Exception as e:
@@ -81,14 +81,16 @@ def create_final_summary(report: str, model_responses: list[dict]) -> str:
         goal="Produce one definitive summary by combining insights from multiple AI model summaries",
         backstory=(
             "You are an expert at distilling complex AI research into clear, "
-            "professional summaries suitable for publication on LinkedIn."
+            "professional summaries suitable for publication on LinkedIn. You ALWAYS write in English only."
         ),
         llm=llm,
         verbose=False,
     )
 
     task = Task(
-        description=f"""You received summaries of an AI report from {len(successful)} different AI models.
+        description=f"""IMPORTANT: Respond in English only. Do not use any other language.
+
+You received summaries of an AI report from {len(successful)} different AI models.
 Create ONE final consolidated summary that captures the best insights from all models.
 
 ORIGINAL REPORT:

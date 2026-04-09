@@ -1,15 +1,17 @@
 # Trend Agent: Search active sources for the most trending AI topic right now.
-# Uses DuckDuckGo for search and a local Ollama model (via CrewAI) to identify
+# Uses Google News RSS and a local Ollama model (via CrewAI) to identify
 # the single most trending topic phrase (3-6 words).
 
 import json
 import os
 import sys
+import urllib.parse
+import xml.etree.ElementTree as ET
 from datetime import datetime
 from pathlib import Path
 
+import requests
 from crewai import Agent, Crew, LLM, Task
-from duckduckgo_search import DDGS
 from dotenv import load_dotenv
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
@@ -31,14 +33,21 @@ ALL_SEARCHES = [
     for s in items
 ]
 
-# ── DuckDuckGo helper ─────────────────────────────────────────────────────────
+# ── Google News RSS helper ────────────────────────────────────────────────────
 
-def ddg_search(query: str, max_results: int = 5) -> list[dict]:
+_GNEWS_RSS = "https://news.google.com/rss/search"
+_HEADERS   = {"User-Agent": "Mozilla/5.0"}
+
+def gnews_search(query: str, max_results: int = 5) -> list[dict]:
     try:
-        with DDGS() as ddgs:
-            return list(ddgs.text(query, max_results=max_results))
+        url  = f"{_GNEWS_RSS}?q={urllib.parse.quote(query)}&hl=en-US&gl=US&ceid=US:en"
+        resp = requests.get(url, headers=_HEADERS, timeout=15)
+        resp.raise_for_status()
+        root  = ET.fromstring(resp.content)
+        items = root.findall(".//item")[:max_results]
+        return [{"title": item.findtext("title", ""), "source": item.findtext("source", "")} for item in items]
     except Exception as e:
-        print(f"  DDG search failed for '{query}': {e}")
+        print(f"  Google News search failed for '{query}': {e}")
         return []
 
 # ── Main agent function ────────────────────────────────────────────────────────
@@ -47,11 +56,11 @@ def get_trending_topic() -> dict:
     source_names = ", ".join(s["label"] for s in ALL_SEARCHES)
     print(f"Trend Agent: Scanning {len(ALL_SEARCHES)} active sources for trending topics...")
 
-    # Step 1: Search each source with DuckDuckGo
+    # Step 1: Search each source with Google News RSS
     snippets = []
     for source in ALL_SEARCHES:
         print(f"  Searching: \"{source['label']}\"")
-        results = ddg_search(source["query"], max_results=3)
+        results = gnews_search(source["query"], max_results=3)
         for r in results:
             snippets.append(f"- {r.get('title', '')} ({source['label']})")
 
@@ -65,13 +74,15 @@ def get_trending_topic() -> dict:
     analyst = Agent(
         role="AI Trend Analyst",
         goal="Identify the single most trending AI topic from recent headlines",
-        backstory="You track the AI industry daily and have a sharp eye for spotting emerging trends.",
+        backstory="You track the AI industry daily and have a sharp eye for spotting emerging trends. You ALWAYS respond in English only.",
         llm=llm,
         verbose=False,
     )
 
     task = Task(
-        description=f"""Below are the latest AI headlines from sources: {source_names}.
+        description=f"""IMPORTANT: Respond in English only. Do not use any other language.
+
+Below are the latest AI headlines from sources: {source_names}.
 
 HEADLINES:
 {headlines_text}

@@ -44,14 +44,16 @@ def organize_content() -> dict:
         goal="Produce a comprehensive, structured technical report from AI news articles",
         backstory=(
             "You are a senior AI researcher with deep expertise in machine learning, "
-            "LLMs, and AI systems. You write clear, insightful technical reports."
+            "LLMs, and AI systems. You write clear, insightful technical reports in English only."
         ),
         llm=llm,
         verbose=False,
     )
 
     task = Task(
-        description=f"""Based on the following AI news articles, create a comprehensive structured technical report.
+        description=f"""IMPORTANT: Respond in English only. Do not use any other language.
+
+Based on the following AI news articles, create a comprehensive structured technical report.
 
 ARTICLES:
 {articles_text}

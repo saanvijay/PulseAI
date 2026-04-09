@@ -121,10 +121,10 @@ cd frontend && uv sync
 
 ### 3. Configure environment variables
 
-Create your `.env` file in the project root:
+Create your `.env` file in the project root (`PulseAI/.env`):
 
 ```bash
-touch .env
+touch PulseAI/.env
 ```
 
 Open `.env` and add the following:
@@ -156,7 +156,8 @@ LINKEDIN_PERSON_ID=your_linkedin_person_id
 ### Option A — Streamlit Dashboard (recommended)
 
 ```bash
-cd frontend
+cd PulseAI/frontend
+uv sync          # install dependencies first (only needed once)
 uv run streamlit run app.py
 ```
 
@@ -308,7 +309,7 @@ LinkedIn requires a one-time OAuth 2.0 setup:
         https://api.linkedin.com/v2/me
    ```
    The `id` field in the response is your `LINKEDIN_PERSON_ID`
-5. Add both values to your `.env` file
+5. Add both values to `PulseAI/.env`
 
 ---
 
