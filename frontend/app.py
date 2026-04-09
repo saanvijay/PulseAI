@@ -62,14 +62,15 @@ def _agent_thread(agent_name, script_path, extra_args=()):
             state["logs"].append(line)
     proc.stdout.close()
     proc.wait()
-    state["running"] = None
-    state["done"]    = True
-    state["process"] = None
+    state["running"]    = None
+    state["last_agent"] = agent_name
+    state["done"]       = True
+    state["process"]    = None
 
 
 def launch_agent(agent_name, script_path, extra_args=()):
     state = get_agent_state()
-    state.update({"running": agent_name, "logs": [], "done": False, "process": None})
+    state.update({"running": agent_name, "last_agent": None, "logs": [], "done": False, "process": None})
     threading.Thread(target=_agent_thread, args=(agent_name, script_path, extra_args), daemon=True).start()
 
 
@@ -214,10 +215,13 @@ with right:
             state["done"]    = False
             st.rerun()
     elif logs:
-        last = logs[-1] if logs else ""
+        last       = logs[-1] if logs else ""
+        last_agent = state.get("last_agent", "Agent")
         if "error" in last.lower() or "failed" in last.lower():
+            st.markdown(f"##### 📡 {last_agent} — Live Log")
             st.error("❌ Agent failed.")
         else:
+            st.markdown(f"##### 📡 {last_agent} — Live Log")
             st.success("✅ Done!")
     else:
         st.markdown("##### 📋 Live Log")
@@ -236,7 +240,7 @@ with right:
         time.sleep(0.5)
         st.rerun()
     elif done:
-        if not st.session_state.topic.strip():
+        if state.get("last_agent") == "Trend Agent":
             trend = load_json("trend_output.json")
             if trend and trend.get("topics"):
                 st.session_state.trend_topics = trend["topics"]

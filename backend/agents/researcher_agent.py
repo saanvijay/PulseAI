@@ -1,12 +1,10 @@
-# Agent 1: Fetch the latest AI news using Google News RSS (parallel), then use
-# a local Ollama model (via CrewAI) to organize results into structured JSON.
-# Searches active sources in parallel batches of 3. If a batch yields too few
-# articles, randomly picks 3 more from inactive sources and retries.
+# Agent 1: Fetch detailed AI news about the selected topic using Google News RSS.
+# Searches the same sources the Trend Agent used, in parallel batches of 3.
+# No LLM involved — raw articles are collected directly and saved as-is.
 
 import json
 import os
 import random
-import re
 import sys
 import urllib.parse
 import xml.etree.ElementTree as ET
@@ -15,19 +13,16 @@ from datetime import datetime
 from pathlib import Path
 
 import requests
-from crewai import Agent, Crew, LLM, Task
 from dotenv import load_dotenv
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 BASE_DIR = Path(__file__).parent.parent
 load_dotenv(BASE_DIR.parent / ".env")
 
-OUTPUT_FILE = BASE_DIR / "output" / "researcher_output.json"
+OUTPUT_FILE  = BASE_DIR / "output" / "researcher_output.json"
+TREND_OUTPUT = BASE_DIR / "output" / "trend_output.json"
 
 # ── Config ────────────────────────────────────────────────────────────────────
-OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-OLLAMA_MODEL    = os.getenv("OLLAMA_MODEL", "llama3.2")
-
 CONFIG_DIR = BASE_DIR.parent / "config"
 
 SOURCES = json.loads((CONFIG_DIR / "sources.json").read_text())
@@ -47,42 +42,40 @@ ACTIVE_SOURCES = [
     if s.get("enabled", True)
 ]
 
-# Minimum articles per batch before triggering fallback
+# Minimum articles per batch before triggering a fallback batch
 MIN_ARTICLES_PER_BATCH = 3
 
-TREND_OUTPUT = BASE_DIR / "output" / "trend_output.json"
+# ── Source selection ──────────────────────────────────────────────────────────
 
-def get_trend_sources() -> tuple[list[dict], list[dict]]:
+def get_primary_and_fallback() -> tuple[list[dict], list[dict]]:
     """
-    Return (primary, fallback) source lists.
-    If trend_output.json exists, primary = sources the trend agent used.
-    Otherwise, primary = active sources from sources.json.
-    Fallback = everything not in primary.
+    Primary = sources the Trend Agent used (from trend_output.json).
+    Fallback = all remaining sources not already in primary.
+    If no trend output exists, primary = enabled sources from sources.json.
     """
     if TREND_OUTPUT.exists():
         try:
             trend = json.loads(TREND_OUTPUT.read_text())
-            scanned_labels = trend.get("sources_scanned", [])
-            if scanned_labels:
-                primary  = [ALL_SOURCES_BY_LABEL[l] for l in scanned_labels if l in ALL_SOURCES_BY_LABEL]
-                used     = set(scanned_labels)
+            scanned = trend.get("sources_scanned", [])
+            if scanned:
+                primary  = [ALL_SOURCES_BY_LABEL[l] for l in scanned if l in ALL_SOURCES_BY_LABEL]
+                used     = set(scanned)
                 fallback = [s for s in ALL_SOURCES_BY_LABEL.values() if s["label"] not in used]
-                print(f"  Using trend agent sources: {', '.join(scanned_labels)}")
+                print(f"  Using trend agent sources: {', '.join(scanned)}", flush=True)
                 return primary, fallback
         except Exception as e:
-            print(f"  Could not read trend_output.json ({e}), using active sources.")
-    return ACTIVE_SOURCES, [
-        s for s in ALL_SOURCES_BY_LABEL.values()
-        if s["label"] not in {a["label"] for a in ACTIVE_SOURCES}
-    ]
+            print(f"  Could not read trend_output.json ({e}), using active sources.", flush=True)
 
-# ── Google News RSS helper ────────────────────────────────────────────────────
+    fallback_labels = {a["label"] for a in ACTIVE_SOURCES}
+    return ACTIVE_SOURCES, [s for s in ALL_SOURCES_BY_LABEL.values() if s["label"] not in fallback_labels]
+
+# ── Google News RSS ───────────────────────────────────────────────────────────
 
 _GNEWS_RSS = "https://news.google.com/rss/search"
 _HEADERS   = {"User-Agent": "Mozilla/5.0"}
 
-def gnews_search(source: dict, topic: str = "", max_results: int = 5) -> tuple[dict, list[dict]]:
-    """Fetch articles for one source. Returns (source, articles) for use in futures."""
+def gnews_search(source: dict, topic: str, max_results: int = 10) -> tuple[dict, list[dict]]:
+    """Fetch articles for one source. Returns (source, articles)."""
     query = f"{topic} {source['query']}" if topic else source["query"]
     try:
         url  = f"{_GNEWS_RSS}?q={urllib.parse.quote(query)}&hl=en-US&gl=US&ceid=US:en"
@@ -93,10 +86,14 @@ def gnews_search(source: dict, topic: str = "", max_results: int = 5) -> tuple[d
         articles = []
         for item in items:
             desc = item.findtext("description", "")
-            desc = ET.fromstring(f"<d>{desc}</d>").text if desc.startswith("<") else desc
+            if desc.startswith("<"):
+                try:
+                    desc = ET.fromstring(f"<d>{desc}</d>").text or ""
+                except Exception:
+                    desc = ""
             articles.append({
                 "title":    item.findtext("title", ""),
-                "snippet":  desc or "",
+                "snippet":  desc.strip(),
                 "link":     item.findtext("link", ""),
                 "source":   source["label"],
                 "category": source["category"],
@@ -104,21 +101,23 @@ def gnews_search(source: dict, topic: str = "", max_results: int = 5) -> tuple[d
             })
         return source, articles
     except Exception as e:
-        print(f"  [ERROR]     {source['label']}: {e}")
+        print(f"  [ERROR]     {source['label']}: {e}", flush=True)
         return source, []
 
 # ── Parallel batch search ─────────────────────────────────────────────────────
 
-def search_batch_parallel(sources: list[dict], topic: str = "", max_results: int = 5) -> list[dict]:
-    """Search a list of sources in parallel, logging each start and completion."""
+def search_batch_parallel(sources: list[dict], topic: str, max_results: int = 10) -> list[dict]:
+    """Search a batch of sources in parallel, logging each start and completion."""
     all_articles = []
     print(f"  Launching {len(sources)} parallel searches...", flush=True)
 
     with ThreadPoolExecutor(max_workers=len(sources)) as executor:
-        futures = {}
+        futures = {
+            executor.submit(gnews_search, source, topic, max_results): source
+            for source in sources
+        }
         for source in sources:
             print(f"  [SEARCHING] {source['label']}...", flush=True)
-            futures[executor.submit(gnews_search, source, topic, max_results)] = source["label"]
 
         for future in as_completed(futures):
             source, articles = future.result()
@@ -131,130 +130,77 @@ def search_batch_parallel(sources: list[dict], topic: str = "", max_results: int
 # ── Main agent function ────────────────────────────────────────────────────────
 
 def fetch_latest_ai_concepts(topic: str = "") -> dict:
-    primary_sources, fallback_sources = get_trend_sources()
+    primary_sources, fallback_sources = get_primary_and_fallback()
 
-    print(f"Agent 1: Starting research across {len(primary_sources)} primary sources", flush=True)
+    print(f"Agent 1: Fetching articles from {len(primary_sources)} primary sources", flush=True)
     if topic:
         print(f"  Topic: \"{topic}\"", flush=True)
 
     remaining_fallbacks = fallback_sources.copy()
     random.shuffle(remaining_fallbacks)
 
-    raw_articles  = []
-    sources_used  = []
-    batch_num     = 0
+    raw_articles = []
+    sources_used = []
+    batch_num    = 0
 
-    # Split primary sources into batches of 3 and search each batch
-    active_batches = [primary_sources[i:i+3] for i in range(0, len(primary_sources), 3)]
+    # Search primary sources in batches of 3
+    primary_batches = [primary_sources[i:i+3] for i in range(0, len(primary_sources), 3)]
 
-    for batch in active_batches:
-        batch_num += 1
+    for batch in primary_batches:
+        batch_num  += 1
         batch_names = [s["label"] for s in batch]
         print(f"\n  Batch {batch_num} (primary): {', '.join(batch_names)}", flush=True)
 
         batch_articles = search_batch_parallel(batch, topic)
         raw_articles.extend(batch_articles)
         sources_used.extend(batch_names)
-        print(f"  Batch {batch_num} total: {len(batch_articles)} articles | Running total: {len(raw_articles)}", flush=True)
+        print(f"  Batch {batch_num}: {len(batch_articles)} articles | Total so far: {len(raw_articles)}", flush=True)
 
-        # If this batch was too thin, queue a fallback batch immediately after
+        # Too thin — pull a fallback batch immediately
         if len(batch_articles) < MIN_ARTICLES_PER_BATCH and remaining_fallbacks:
-            fallback_batch = remaining_fallbacks[:3]
+            fallback_batch  = remaining_fallbacks[:3]
             remaining_fallbacks = remaining_fallbacks[3:]
-            fb_names = [s["label"] for s in fallback_batch]
-            print(f"\n  Batch {batch_num} returned only {len(batch_articles)} articles — "
-                  f"trying fallback: {', '.join(fb_names)}")
-            batch_num += 1
+            fb_names        = [s["label"] for s in fallback_batch]
+            batch_num      += 1
+            print(f"\n  Only {len(batch_articles)} articles — fallback batch {batch_num}: {', '.join(fb_names)}", flush=True)
             fb_articles = search_batch_parallel(fallback_batch, topic)
             raw_articles.extend(fb_articles)
             sources_used.extend(fb_names)
-            print(f"  Fallback batch total: {len(fb_articles)} articles | Running total: {len(raw_articles)}")
+            print(f"  Fallback batch {batch_num}: {len(fb_articles)} articles | Total so far: {len(raw_articles)}", flush=True)
 
-    # If still very few results, drain remaining fallbacks in batches of 3
+    # Still too few — drain remaining fallbacks
     while len(raw_articles) < MIN_ARTICLES_PER_BATCH and remaining_fallbacks:
-        fallback_batch = remaining_fallbacks[:3]
+        fallback_batch      = remaining_fallbacks[:3]
         remaining_fallbacks = remaining_fallbacks[3:]
-        fb_names = [s["label"] for s in fallback_batch]
-        batch_num += 1
-        print(f"\n  Still only {len(raw_articles)} articles total — "
-              f"trying next fallback batch: {', '.join(fb_names)}")
+        fb_names            = [s["label"] for s in fallback_batch]
+        batch_num          += 1
+        print(f"\n  Still only {len(raw_articles)} articles — trying: {', '.join(fb_names)}", flush=True)
         fb_articles = search_batch_parallel(fallback_batch, topic)
         raw_articles.extend(fb_articles)
         sources_used.extend(fb_names)
-        print(f"  Batch total: {len(fb_articles)} articles | Running total: {len(raw_articles)}")
+        print(f"  Batch {batch_num}: {len(fb_articles)} articles | Total so far: {len(raw_articles)}", flush=True)
 
-    print(f"\n  Raw results: {len(raw_articles)} articles collected across {len(sources_used)} sources.")
-    print("  Organizing with Ollama...")
+    # Deduplicate by link
+    seen  = set()
+    unique_articles = []
+    for a in raw_articles:
+        if a["link"] not in seen:
+            seen.add(a["link"])
+            unique_articles.append(a)
 
-    # Step 2: Use CrewAI + Ollama to filter and structure results
-    llm = LLM(model=f"ollama/{OLLAMA_MODEL}", base_url=OLLAMA_BASE_URL)
-
-    raw_text = "\n\n".join(
-        f"[{a['source']} | {a['category']}]\nTitle: {a['title']}\nSnippet: {a['snippet']}\nURL: {a['link']}"
-        for a in raw_articles
-    )
-
-    topic_line = f'Focus specifically on: "{topic}"\n\n' if topic else ""
-
-    analyst = Agent(
-        role="AI News Curator",
-        goal="Select and organize the most relevant AI news articles into structured JSON",
-        backstory="You are a senior AI research curator who selects the most informative and unique articles. You ALWAYS respond in English only.",
-        llm=llm,
-        verbose=False,
-    )
-
-    task = Task(
-        description=f"""IMPORTANT: Respond in English only. Do not use any other language.
-
-{topic_line}From the raw search results below, select the best 20-25 unique and informative articles.
-Remove duplicates and low-quality results.
-
-RAW RESULTS:
-{raw_text}
-
-Return ONLY a raw JSON array — no explanation, no markdown fences:
-[
-  {{
-    "title": "article title",
-    "snippet": "2-3 sentence summary",
-    "link": "full URL",
-    "source": "source name",
-    "category": "research | lab_blogs | newsletters | news | community",
-    "date": null
-  }}
-]""",
-        expected_output="A raw JSON array of article objects with no markdown or extra text.",
-        agent=analyst,
-    )
-
-    crew        = Crew(agents=[analyst], tasks=[task], verbose=False)
-    result      = crew.kickoff()
-    output_text = str(result)
-
-    # Parse JSON from agent output
-    articles = []
-    try:
-        json_match = re.search(r"\[[\s\S]*\]", output_text)
-        if json_match:
-            articles = json.loads(json_match.group())
-        else:
-            raise ValueError("No JSON array found in agent output")
-    except Exception as err:
-        print(f"  Could not parse agent JSON ({err}), using raw results.")
-        articles = raw_articles
+    print(f"\n  {len(unique_articles)} unique articles collected from {len(sources_used)} sources.", flush=True)
 
     output = {
         "timestamp":        datetime.utcnow().isoformat(),
         "topic":            topic or "Latest AI updates",
-        "total":            len(articles),
+        "total":            len(unique_articles),
         "sources_searched": sources_used,
-        "articles":         articles,
+        "articles":         unique_articles,
     }
 
     OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT_FILE.write_text(json.dumps(output, indent=2))
-    print(f"Agent 1: Done! Found {len(articles)} articles across {len(sources_used)} sources.")
+    print(f"Agent 1: Done! {len(unique_articles)} articles saved.", flush=True)
     return output
 
 
