@@ -56,6 +56,14 @@ PulseAI/
 │   │   ├── sources.py            # Search sources (uncomment to add more)
 │   │   └── tokens.py             # Ollama context/token limits
 │   ├── output/                   # JSON outputs (created at runtime, gitignored)
+│   ├── tests/
+│   │   ├── conftest.py           # Shared pytest fixtures
+│   │   ├── test_researcher_agent.py
+│   │   ├── test_analyst_agent.py
+│   │   ├── test_synthesizer_agent.py
+│   │   ├── test_publisher_agent.py
+│   │   ├── test_trend_agent.py
+│   │   └── test_integration.py   # Full pipeline integration test
 │   └── orchestrator.py           # Runs all agents in sequence
 ├── frontend/
 │   ├── app.py                    # Streamlit dashboard
@@ -178,6 +186,55 @@ python agents/publisher_agent.py
 # Auto-detect trending topic
 python agents/trend_agent.py
 ```
+
+---
+
+## Testing
+
+The test suite covers every agent with mock unit tests and a full pipeline integration test. No Ollama server or internet connection is required — all external calls (DuckDuckGo, Ollama, Gmail, LinkedIn) are mocked.
+
+### Install test dependency
+
+```bash
+cd frontend
+uv add --dev pytest
+```
+
+### Run all tests
+
+```bash
+cd frontend
+uv run pytest ../backend/tests/ -v
+```
+
+Expected output: **63 tests passing** in under 2 seconds.
+
+### Run tests for a specific agent
+
+```bash
+uv run pytest ../backend/tests/test_researcher_agent.py -v
+uv run pytest ../backend/tests/test_analyst_agent.py -v
+uv run pytest ../backend/tests/test_synthesizer_agent.py -v
+uv run pytest ../backend/tests/test_publisher_agent.py -v
+uv run pytest ../backend/tests/test_trend_agent.py -v
+```
+
+### Run only the integration test
+
+```bash
+uv run pytest ../backend/tests/test_integration.py -v
+```
+
+### What is tested
+
+| File | Tests | Coverage |
+|------|-------|----------|
+| `test_researcher_agent.py` | 9 | DDG search, article curation, topic injection, JSON fallback, file output |
+| `test_analyst_agent.py` | 6 | Report schema, article count, file output, missing input error |
+| `test_synthesizer_agent.py` | 13 | Ollama HTTP calls, per-model success/error, final consolidation, model counts |
+| `test_publisher_agent.py` | 12 | LinkedIn post formatting, SMTP email, API calls, env var gating, error handling |
+| `test_trend_agent.py` | 9 | DDG search, topic extraction, quote stripping, empty results, file output |
+| `test_integration.py` | 8 | Full pipeline sequence, inter-agent data flow, output schemas, topic arg, credentials, dependency chain |
 
 ---
 
