@@ -88,15 +88,6 @@ busy  = state["running"] is not None
 
 st.markdown("""
 <style>
-div[data-testid="stColumn"]:has(span.btn-apply) [data-testid="stButton"] button {
-    background-color: #28a745 !important;
-    border-color: #28a745 !important;
-    color: white !important;
-}
-div[data-testid="stColumn"]:has(span.btn-apply) [data-testid="stButton"] button:hover {
-    background-color: #218838 !important;
-    border-color: #1e7e34 !important;
-}
 div[data-testid="stColumn"]:has(span.btn-agent) [data-testid="stButton"] button {
     background-color: #555555 !important;
     border-color: #555555 !important;
@@ -125,22 +116,8 @@ with left:
 
     st.divider()
 
-    # Topic input + Trend Agent
+    # Topic + Trend Agent
     st.markdown("##### Research Topic")
-    inp_col, btn_col = st.columns([5, 1], vertical_alignment="bottom")
-    with inp_col:
-        topic_input = st.text_input(
-            "topic",
-            value=st.session_state.topic,
-            placeholder="e.g. LLM reasoning, AI agents... (leave blank for general AI news)",
-            label_visibility="collapsed",
-            disabled=busy,
-        )
-    with btn_col:
-        st.markdown('<span class="btn-apply"></span>', unsafe_allow_html=True)
-        if st.button("Apply", use_container_width=True, disabled=busy):
-            st.session_state.topic = topic_input
-            st.rerun()
     topic = st.session_state.topic
 
     if st.button("🔍 Trend Agent — Auto-detect Topic", use_container_width=True, disabled=busy):
