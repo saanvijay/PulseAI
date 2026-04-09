@@ -5,4 +5,9 @@ description = "Multi-agent pipeline for latest AI updates"
 requires-python = ">=3.11"
 dependencies = [
     "streamlit>=1.32.0",
+    "crewai>=0.80.0",
+    "crewai-tools>=0.14.0",
+    "duckduckgo-search>=6.0.0",
+    "python-dotenv>=1.0.0",
+    "requests>=2.31.0",
 ]

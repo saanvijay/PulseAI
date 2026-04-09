@@ -1,41 +1,40 @@
 # 🤖 PulseAI — Latest AI Updates Pipeline
 
-A multi-agent system that automatically fetches, organizes, summarizes, and publishes the latest AI developments. Each agent is a focused, single-responsibility Node.js module orchestrated through a Streamlit dashboard.
+A multi-agent system that automatically fetches, organizes, summarizes, and publishes the latest AI developments — running entirely on **local models** via **CrewAI + Ollama**. No cloud AI API keys required.
 
 ---
 
 ## How It Works
 
 ```
-Web Sources
-    │
-    ▼
+Web Sources (DuckDuckGo)
+         │
+         ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  Agent 1: Fetch                                                 │
-│  Searches the web using Serper API across 4 AI-focused queries  │
-│  → Collects titles, snippets, and links                         │
+│  Agent 1: Researcher                                            │
+│  Searches the web via DuckDuckGo across configured AI sources   │
+│  → Ollama organizes results into structured articles JSON       │
 └───────────────────────────┬─────────────────────────────────────┘
-                            │ agent1_output.json
+                            │ researcher_output.json
                             ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  Agent 2: Organize                                              │
-│  Sends raw articles to Claude Opus 4.6                          │
-│  → Produces a structured 8-section technical report             │
+│  Agent 2: Analyst                                               │
+│  CrewAI + Ollama reads the articles                             │
+│  → Produces a structured 8-section technical report            │
 └───────────────────────────┬─────────────────────────────────────┘
-                            │ agent2_output.json
+                            │ analyst_output.json
                             ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  Agent 3: Summarize                                             │
-│  Sends the report to 5 AI models in parallel:                   │
-│    Claude Opus 4.6  ·  GPT-4o  ·  Gemini 1.5 Pro                │
-│    Mistral Large    ·  Cohere Command R+                        │
-│  → Claude consolidates all responses into one final summary     │
+│  Agent 3: Synthesizer                                           │
+│  Sends the report to 5 local Ollama models:                     │
+│    Llama 3.2  ·  Mistral  ·  Qwen 2.5  ·  Phi-3  ·  Gemma 2   │
+│  → Ollama consolidates all responses into one final summary     │
 └───────────────────────────┬─────────────────────────────────────┘
-                            │ agent3_output.json
+                            │ synthesizer_output.json
                             ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  Agent 4: Publish                                               │
-│  → Sends the summary via Email (Gmail + Nodemailer)             │
+│  Agent 4: Publisher                                             │
+│  → Sends the summary via Email (Gmail)                          │
 │  → Posts to LinkedIn                                            │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -48,17 +47,20 @@ Web Sources
 PulseAI/
 ├── backend/
 │   ├── agents/
-│   │   ├── researcher_agent.js   # Claude web search across 16 sources
-│   │   ├── analyst_agent.js      # Structures content with Claude
-│   │   ├── synthesizer_agent.js  # 5 AI models via OpenRouter + final summary
-│   │   └── publisher_agent.js    # Email + LinkedIn publishing
+│   │   ├── researcher_agent.py   # DuckDuckGo search + Ollama curation
+│   │   ├── analyst_agent.py      # CrewAI + Ollama 8-section report
+│   │   ├── synthesizer_agent.py  # 5 local Ollama models + consolidation
+│   │   ├── publisher_agent.py    # Email (smtplib) + LinkedIn API
+│   │   └── trend_agent.py        # DuckDuckGo + Ollama trend detection
+│   ├── config/
+│   │   ├── sources.py            # Search sources (uncomment to add more)
+│   │   └── tokens.py             # Ollama context/token limits
 │   ├── output/                   # JSON outputs (created at runtime, gitignored)
-│   ├── orchestrator.js           # Runs all agents in sequence
-│   └── package.json
+│   └── orchestrator.py           # Runs all agents in sequence
 ├── frontend/
 │   ├── app.py                    # Streamlit dashboard
 │   └── pyproject.toml            # Python dependencies (uv)
-├── .env                          # Your API keys (gitignored)
+├── .env                          # Your configuration (gitignored)
 ├── .gitignore
 └── README.md
 ```
@@ -67,48 +69,77 @@ PulseAI/
 
 ## Setup
 
-### 1. Clone and install dependencies
+### 1. Install Ollama
+
+Download and install Ollama from [ollama.com](https://ollama.com), then start the server:
+
+```bash
+ollama serve
+```
+
+Pull the primary model (required):
+
+```bash
+ollama pull llama3.2
+```
+
+Pull additional models for the Synthesizer agent (optional — skipped gracefully if missing):
+
+```bash
+ollama pull mistral
+ollama pull qwen2.5
+ollama pull phi3
+ollama pull gemma2
+```
+
+### 2. Clone and install Python dependencies
 
 ```bash
 git clone <your-repo-url>
 cd PulseAI
-
-# Node.js dependencies
-cd backend && npm install && cd ..
-
-# Python dependencies (using uv)
-cd frontend && uv sync && cd ..
 ```
 
-> **Install uv** if you don't have it: `curl -LsSf https://astral.sh/uv/install.sh | sh`
-
-### 2. Configure environment variables
+Install [uv](https://github.com/astral-sh/uv) if you don't have it:
 
 ```bash
-cp .env.example .env
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-Open `.env` and fill in your API keys:
+Install all dependencies (Streamlit + CrewAI + tools):
+
+```bash
+cd frontend && uv sync
+```
+
+### 3. Configure environment variables
+
+Create your `.env` file in the project root:
+
+```bash
+touch .env
+```
+
+Open `.env` and add the following:
 
 ```env
-# AI Models
-ANTHROPIC_API_KEY=your_anthropic_api_key      # platform.anthropic.com — Agent 1 (web search), Agent 2, Agent 3 (Claude)
-OPENROUTER_API_KEY=your_openrouter_api_key    # openrouter.ai — Agent 3: GPT-4o, Gemini, Mistral, Cohere
+# ── Ollama (local — no API key needed) ────────────────────────────
+OLLAMA_MODEL=llama3.2
+OLLAMA_BASE_URL=http://localhost:11434
 
-# Email — use a Gmail App Password, NOT your account password
+# ── Email via Gmail (optional — Agent 4) ─────────────────────────
+# Use a Gmail App Password, NOT your account password.
 # Enable at: myaccount.google.com → Security → App Passwords
 EMAIL_USER=your_email@gmail.com
 EMAIL_PASS=your_gmail_app_password
 EMAIL_TO=recipient@example.com
 
-# LinkedIn — see LinkedIn Setup section below
+# ── LinkedIn (optional — Agent 4) ────────────────────────────────
+# See the LinkedIn Setup section below.
 LINKEDIN_ACCESS_TOKEN=your_linkedin_access_token
 LINKEDIN_PERSON_ID=your_linkedin_person_id
 ```
 
-> **Note:** Agent 3 requires all 5 AI model keys to get responses from all models. If a key is missing, that model will be skipped and the final summary will be based on the remaining responses.
-
-> **Note:** Agent 4 email and LinkedIn are optional. If the keys are not set, those steps are skipped gracefully.
+> **Note:** Email and LinkedIn are optional. If their keys are not set, Agent 4 skips those steps gracefully.
 
 ---
 
@@ -122,33 +153,80 @@ uv run streamlit run app.py
 ```
 
 The dashboard gives you:
-- A **Run Full Pipeline** button to execute all 4 agents at once
+- A **Run Full Pipeline** button to execute all 4 agents in sequence
 - Individual buttons to run each agent separately
-- Four tabs showing the output of each agent in real time
+- A **Trend Agent** button to auto-detect the most trending AI topic
+- Live log window streaming agent output in real time
+- Collapsible panels showing each agent's output
 
 ### Option B — Command Line
 
 ```bash
 cd backend
 
-# Run the full pipeline
-node orchestrator.js
+# Run the full pipeline (optional topic argument)
+python orchestrator.py
+python orchestrator.py "LLM reasoning and planning"
 
-# Or run individual agents
-node agents/researcher_agent.js
-node agents/analyst_agent.js
-node agents/synthesizer_agent.js
-node agents/publisher_agent.js
+# Run individual agents
+python agents/researcher_agent.py
+python agents/researcher_agent.py "multimodal models"
+python agents/analyst_agent.py
+python agents/synthesizer_agent.py
+python agents/publisher_agent.py
+
+# Auto-detect trending topic
+python agents/trend_agent.py
 ```
+
+---
+
+## Configuring Sources
+
+By default, 3 sources are active. Open [backend/config/sources.py](backend/config/sources.py) and uncomment any sources you want to add:
+
+```python
+SOURCES = {
+    "research": [
+        # {"query": "site:arxiv.org/abs AI machine learning 2026", "label": "ArXiv"},
+    ],
+    "lab_blogs": [
+        {"query": "Anthropic research latest AI 2026",  "label": "Anthropic Research"},  # ✅ active
+        {"query": "OpenAI blog latest news 2026",       "label": "OpenAI Blog"},          # ✅ active
+        {"query": "Google DeepMind research 2026",      "label": "Google DeepMind"},      # ✅ active
+        # {"query": "Meta AI blog latest 2026",         "label": "Meta AI Blog"},
+        ...
+    ],
+    ...
+}
+```
+
+Each active source triggers one DuckDuckGo search call.
+
+---
+
+## Synthesizer Models
+
+Agent 3 queries these Ollama models and consolidates their responses:
+
+| Model | Pull command | Required? |
+|-------|-------------|-----------|
+| Llama 3.2 | `ollama pull llama3.2` | ✅ Yes (also used as primary) |
+| Mistral | `ollama pull mistral` | Optional |
+| Qwen 2.5 | `ollama pull qwen2.5` | Optional |
+| Phi-3 | `ollama pull phi3` | Optional |
+| Gemma 2 | `ollama pull gemma2` | Optional |
+
+To change the primary model, set `OLLAMA_MODEL=<model>` in your `.env`. To add or remove models from the synthesizer, edit `OLLAMA_MODELS` in [backend/agents/synthesizer_agent.py](backend/agents/synthesizer_agent.py).
 
 ---
 
 ## Report Sections (Agent 2 Output)
 
-Agent 2 uses Claude to structure the raw articles into a standardized 8-section report:
+Agent 2 uses Ollama to structure raw articles into a standardized 8-section report:
 
 | # | Section | What it covers |
-|---|---------|---------------|
+|---|---------|----------------|
 | 1 | **Introduction** | Overview of latest trends and why they matter |
 | 2 | **Existing Problems** | Challenges that motivated new developments |
 | 3 | **Proposed Solutions** | New approaches, models, or methods introduced |
@@ -162,12 +240,12 @@ Agent 2 uses Claude to structure the raw articles into a standardized 8-section 
 
 ## LinkedIn Setup
 
-LinkedIn requires OAuth 2.0. Here is the one-time setup:
+LinkedIn requires a one-time OAuth 2.0 setup:
 
 1. Go to the [LinkedIn Developer Portal](https://www.linkedin.com/developers/) and create an app
 2. Add the `w_member_social` and `r_liteprofile` OAuth scopes
 3. Use the **OAuth 2.0 tools** tab in the portal to generate an access token
-4. Find your Person ID by calling:
+4. Find your Person ID:
    ```bash
    curl -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
         https://api.linkedin.com/v2/me
@@ -181,18 +259,9 @@ LinkedIn requires OAuth 2.0. Here is the one-time setup:
 
 | Layer | Technology |
 |-------|-----------|
-| Agent runtime | Node.js |
-| Dashboard | Python + Streamlit (managed with uv) |
-| Web search | Serper API |
-| AI models | Claude Opus 4.6, GPT-4o, Gemini 1.5 Pro, Mistral Large, Cohere Command R+ |
-| Email | Nodemailer (Gmail) |
-| Social | LinkedIn UGC Posts API |
-
----
-
-## API Keys Reference
-
-| Key | Where to get it | Free tier |
-|-----|----------------|-----------|
-| `ANTHROPIC_API_KEY` | [platform.anthropic.com](https://platform.anthropic.com) | Pay-as-you-go |
-| `OPENROUTER_API_KEY` | [openrouter.ai](https://openrouter.ai) | Free tier available — covers GPT-4o, Gemini, Mistral, Cohere |
+| Agent framework | Python + CrewAI |
+| Local LLMs | Ollama (llama3.2, mistral, qwen2.5, phi3, gemma2) |
+| Web search | DuckDuckGo (no API key required) |
+| Dashboard | Streamlit (managed with uv) |
+| Email | Python smtplib (Gmail) |
+| Social | LinkedIn UGC Posts API v2 |

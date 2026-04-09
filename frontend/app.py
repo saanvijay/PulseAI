@@ -5,6 +5,7 @@ PulseAI - Streamlit Dashboard for the Multi-Agent AI Pipeline
 import json
 import os
 import subprocess
+import sys
 import threading
 import time
 import streamlit as st
@@ -46,7 +47,7 @@ def load_json(filename):
 
 def _agent_thread(agent_name, script_path, extra_args=()):
     state = get_agent_state()
-    cmd   = ["node", script_path, *extra_args]
+    cmd   = [sys.executable, script_path, *extra_args]
     proc  = subprocess.Popen(
         cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
         text=True, bufsize=1, cwd=BACKEND_DIR,
@@ -113,8 +114,8 @@ left, right = st.columns([1, 1], gap="large")
 with left:
     st.title("🤖 PulseAI")
     st.markdown(
-        "A **4-agent AI pipeline** that automatically fetches the latest AI news, "
-        "organizes it into a structured report, summarizes it across multiple AI models, "
+        "A **4-agent AI pipeline** powered by **CrewAI + Ollama** that fetches the latest AI news, "
+        "organizes it into a structured report, summarizes it across multiple local models, "
         "and publishes the result via Email and LinkedIn."
     )
 
@@ -142,7 +143,7 @@ with left:
         if topic.strip():
             st.info("Topic already set. Clear the box to auto-detect.")
         else:
-            launch_agent("Trend Agent", os.path.join(BACKEND_DIR, "agents/trend_agent.js"))
+            launch_agent("Trend Agent", os.path.join(BACKEND_DIR, "agents/trend_agent.py"))
             st.rerun()
 
     st.divider()
@@ -154,18 +155,18 @@ with left:
         st.markdown('<span class="btn-agent"></span>', unsafe_allow_html=True)
         if st.button("🔎 Researcher",  use_container_width=True, disabled=busy):
             args = (topic,) if topic else ()
-            launch_agent("Researcher Agent", os.path.join(BACKEND_DIR, "agents/researcher_agent.js"), args)
+            launch_agent("Researcher Agent", os.path.join(BACKEND_DIR, "agents/researcher_agent.py"), args)
             st.rerun()
         if st.button("🧠 Synthesizer", use_container_width=True, disabled=busy):
-            launch_agent("Synthesizer Agent", os.path.join(BACKEND_DIR, "agents/synthesizer_agent.js"))
+            launch_agent("Synthesizer Agent", os.path.join(BACKEND_DIR, "agents/synthesizer_agent.py"))
             st.rerun()
     with b_col:
         st.markdown('<span class="btn-agent"></span>', unsafe_allow_html=True)
         if st.button("📋 Analyst",   use_container_width=True, disabled=busy):
-            launch_agent("Analyst Agent", os.path.join(BACKEND_DIR, "agents/analyst_agent.js"))
+            launch_agent("Analyst Agent", os.path.join(BACKEND_DIR, "agents/analyst_agent.py"))
             st.rerun()
         if st.button("📤 Publisher", use_container_width=True, disabled=busy):
-            launch_agent("Publisher Agent", os.path.join(BACKEND_DIR, "agents/publisher_agent.js"))
+            launch_agent("Publisher Agent", os.path.join(BACKEND_DIR, "agents/publisher_agent.py"))
             st.rerun()
 
     st.divider()
@@ -173,7 +174,7 @@ with left:
     # Full pipeline
     if st.button("🚀 Run Full Pipeline", use_container_width=True, type="primary", disabled=busy):
         args = (topic,) if topic else ()
-        launch_agent("Full Pipeline", os.path.join(BACKEND_DIR, "orchestrator.js"), args)
+        launch_agent("Full Pipeline", os.path.join(BACKEND_DIR, "orchestrator.py"), args)
         st.rerun()
 
     if st.button("🔄 Refresh Results", use_container_width=True, disabled=busy):
@@ -281,7 +282,7 @@ with st.expander("🧠 Synthesizer Agent — Multi-Model Summary", expanded=Fals
         st.markdown("### 🏆 Final Consolidated Summary")
         st.success(data.get("final_summary", "No summary."))
         st.markdown("### Individual Model Responses")
-        MODEL_ICONS = {"Claude Opus 4.6": "🟠", "GPT-4o": "🟢", "Gemini 1.5 Pro": "🔵", "Mistral Large": "🟣", "Cohere Command R+": "🔴"}
+        MODEL_ICONS = {"Llama 3.2": "🟠", "Mistral": "🟢", "Qwen 2.5": "🔵", "Phi-3": "🟣", "Gemma 2": "🔴"}
         cols = st.columns(2)
         for i, r in enumerate(data.get("model_responses", [])):
             with cols[i % 2]:
