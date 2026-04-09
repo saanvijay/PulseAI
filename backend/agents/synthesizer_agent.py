@@ -57,7 +57,17 @@ def ask_ollama(model: str, prompt: str, max_tokens: int = 1024) -> str:
 def call_model(name: str, model: str, report: str) -> dict:
     try:
         print(f"  Asking {name}...")
-        prompt  = f"IMPORTANT: Respond in English only. Do not use any other language.\n\nSummarize this AI report in 3-4 key insights:\n\n{report}"
+        prompt = (
+            "IMPORTANT: Respond in English only. Do not use any other language.\n\n"
+            "You are an expert AI research analyst. Analyse the following AI report in depth and provide:\n\n"
+            "1. **Key Developments** — The most significant breakthroughs or announcements and why they matter\n"
+            "2. **Technical Insights** — Notable technical details, architectural choices, or methodology advances\n"
+            "3. **Industry Impact** — How these developments affect companies, researchers, and end users\n"
+            "4. **Risks & Limitations** — Concerns, open problems, or caveats raised\n"
+            "5. **What to Watch** — The most important trends or follow-up areas to monitor\n\n"
+            "Be specific and detailed. Reference actual models, papers, or companies from the report where relevant.\n\n"
+            f"REPORT:\n{report}"
+        )
         summary = ask_ollama(model, prompt, TOKENS["synthesizer_per_model"])
         return {"model": name, "status": "success", "summary": summary}
     except Exception as e:
@@ -88,24 +98,43 @@ def create_final_summary(report: str, model_responses: list[dict]) -> str:
     task = Task(
         description=f"""IMPORTANT: Respond in English only. Do not use any other language.
 
-You received summaries of an AI report from {len(successful)} different AI models.
-Create ONE final consolidated summary that captures the best insights from all models.
+You have received in-depth analyses of an AI report from {len(successful)} different AI models.
+Your task is to produce ONE comprehensive, well-structured final summary that synthesises the best insights from all of them.
 
 ORIGINAL REPORT:
 {report}
 
-MODEL SUMMARIES:
+MODEL ANALYSES:
 {responses_text}
 
-Write a final summary that:
-1. Combines the best points from all models
-2. Highlights the most important AI developments
-3. Is clear and easy to understand
-4. Is suitable for a LinkedIn post (professional tone)
-5. Is between 200-300 words
+Write a final summary structured with these sections:
 
-Return only the summary text with no headings or extra commentary.""",
-        expected_output="A 200-300 word professional summary of the AI report.",
+## Overview
+2-3 sentences capturing the overall theme and significance of this week's AI developments.
+
+## Key Breakthroughs
+The most important advances — be specific about models, companies, benchmarks, or papers mentioned.
+
+## Technical Deep-Dive
+The most interesting technical details, architectural choices, or methodological innovations.
+
+## Industry & Business Impact
+How these developments affect the AI industry, enterprises adopting AI, and the competitive landscape.
+
+## Risks, Limitations & Open Questions
+Honest assessment of what's missing, what could go wrong, and unsolved problems.
+
+## What to Watch Next
+The 3-5 most important things to follow up on in the coming weeks.
+
+Guidelines:
+- Be specific — name models, companies, researchers, and numbers from the report
+- Aim for 600-800 words total
+- Use bullet points within sections where appropriate
+- Professional but accessible tone, suitable for a technical LinkedIn audience
+
+Return only the structured summary with no meta-commentary.""",
+        expected_output="A 600-800 word structured summary with 6 clearly marked sections.",
         agent=consolidator,
     )
 
