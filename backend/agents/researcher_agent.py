@@ -28,19 +28,34 @@ CONFIG_DIR = BASE_DIR.parent / "config"
 SOURCES = json.loads((CONFIG_DIR / "sources.json").read_text())
 TOKENS  = json.loads((CONFIG_DIR / "tokens.json").read_text())
 
-# All sources as a label → object lookup (active and inactive)
+# All sources as a label → object lookup
 ALL_SOURCES_BY_LABEL = {
     s["label"]: {"query": s["query"], "label": s["label"], "category": cat}
     for cat, items in SOURCES.items()
     for s in items
 }
 
-ACTIVE_SOURCES = [
-    ALL_SOURCES_BY_LABEL[s["label"]]
+# Researcher uses ALL sources from these categories regardless of "enabled" flag
+# (enabled flag is only used by the Trend Agent)
+RESEARCHER_CATEGORIES   = {"lab_blogs", "newsletters", "news", "community"}
+RESEARCHER_FALLBACK_CAT = {"research"}
+
+RESEARCHER_PRIMARY_SOURCES = [
+    {"query": s["query"], "label": s["label"], "category": cat}
     for cat, items in SOURCES.items()
     for s in items
-    if s.get("enabled", True)
+    if cat in RESEARCHER_CATEGORIES
 ]
+
+RESEARCHER_FALLBACK_SOURCES = [
+    {"query": s["query"], "label": s["label"], "category": cat}
+    for cat, items in SOURCES.items()
+    for s in items
+    if cat in RESEARCHER_FALLBACK_CAT
+]
+
+# Articles fetched per source
+ARTICLES_PER_SOURCE = 3
 
 # Minimum articles per batch before triggering a fallback batch
 MIN_ARTICLES_PER_BATCH = 3
@@ -49,32 +64,36 @@ MIN_ARTICLES_PER_BATCH = 3
 
 def get_primary_and_fallback() -> tuple[list[dict], list[dict]]:
     """
-    Primary = sources the Trend Agent used (from trend_output.json).
-    Fallback = all remaining sources not already in primary.
-    If no trend output exists, primary = enabled sources from sources.json.
+    Primary = trend agent's sources first (so the topic-relevant sources lead),
+              followed by all other researcher-category sources not already in that set.
+    Fallback = research category (arxiv etc.) — only used if primary yields nothing.
+    If no trend output exists, primary = all researcher-category sources.
     """
+    trend_labels = []
     if TREND_OUTPUT.exists():
         try:
             trend = json.loads(TREND_OUTPUT.read_text())
-            scanned = trend.get("sources_scanned", [])
-            if scanned:
-                primary  = [ALL_SOURCES_BY_LABEL[l] for l in scanned if l in ALL_SOURCES_BY_LABEL]
-                used     = set(scanned)
-                fallback = [s for s in ALL_SOURCES_BY_LABEL.values() if s["label"] not in used]
-                print(f"  Using trend agent sources: {', '.join(scanned)}", flush=True)
-                return primary, fallback
+            trend_labels = trend.get("sources_scanned", [])
+            if trend_labels:
+                print(f"  Trend agent used: {', '.join(trend_labels)}", flush=True)
         except Exception as e:
-            print(f"  Could not read trend_output.json ({e}), using active sources.", flush=True)
+            print(f"  Could not read trend_output.json ({e}).", flush=True)
 
-    fallback_labels = {a["label"] for a in ACTIVE_SOURCES}
-    return ACTIVE_SOURCES, [s for s in ALL_SOURCES_BY_LABEL.values() if s["label"] not in fallback_labels]
+    # Build primary: trend sources first, then all remaining researcher sources
+    trend_set = set(trend_labels)
+    trend_sources  = [ALL_SOURCES_BY_LABEL[l] for l in trend_labels if l in ALL_SOURCES_BY_LABEL]
+    other_sources  = [s for s in RESEARCHER_PRIMARY_SOURCES if s["label"] not in trend_set]
+    primary        = trend_sources + other_sources
+
+    print(f"  Primary sources ({len(primary)}): {', '.join(s['label'] for s in primary)}", flush=True)
+    return primary, RESEARCHER_FALLBACK_SOURCES
 
 # ── Google News RSS ───────────────────────────────────────────────────────────
 
 _GNEWS_RSS = "https://news.google.com/rss/search"
 _HEADERS   = {"User-Agent": "Mozilla/5.0"}
 
-def gnews_search(source: dict, topic: str, max_results: int = 10) -> tuple[dict, list[dict]]:
+def gnews_search(source: dict, topic: str, max_results: int = ARTICLES_PER_SOURCE) -> tuple[dict, list[dict]]:
     """Fetch articles for one source. Returns (source, articles)."""
     query = f"{topic} {source['query']}" if topic else source["query"]
     try:
@@ -106,7 +125,7 @@ def gnews_search(source: dict, topic: str, max_results: int = 10) -> tuple[dict,
 
 # ── Parallel batch search ─────────────────────────────────────────────────────
 
-def search_batch_parallel(sources: list[dict], topic: str, max_results: int = 10) -> list[dict]:
+def search_batch_parallel(sources: list[dict], topic: str, max_results: int = ARTICLES_PER_SOURCE) -> list[dict]:
     """Search a batch of sources in parallel, logging each start and completion."""
     all_articles = []
     print(f"  Launching {len(sources)} parallel searches...", flush=True)
@@ -122,7 +141,7 @@ def search_batch_parallel(sources: list[dict], topic: str, max_results: int = 10
         for future in as_completed(futures):
             source, articles = future.result()
             count = len(articles)
-            print(f"  [DONE]      {source['label']} — {count} article{'s' if count != 1 else ''} found", flush=True)
+            print(f"  [DONE]      {source['label']} [{source['category']}] — {count} article{'s' if count != 1 else ''} found", flush=True)
             all_articles.extend(articles)
 
     return all_articles

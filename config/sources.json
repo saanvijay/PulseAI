@@ -16,6 +16,7 @@
     {"query": "Import AI Jack Clark newsletter 2026", "label": "Import AI", "enabled": false}
   ],
   "news": [
+    {"query": "site:news.ycombinator.com AI machine learning 2026", "label": "Hacker News", "enabled": false},
     {"query": "site:venturebeat.com AI news 2026", "label": "VentureBeat", "enabled": false},
     {"query": "site:techcrunch.com artificial intelligence 2026", "label": "TechCrunch AI", "enabled": false},
     {"query": "site:wired.com artificial intelligence 2026", "label": "Wired AI", "enabled": false}
