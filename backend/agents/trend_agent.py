@@ -10,7 +10,7 @@ import re
 import urllib.parse
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
@@ -171,7 +171,7 @@ Example format:
         print(f"    {i}. {t}")
 
     output = {
-        "timestamp":       datetime.utcnow().isoformat(),
+        "timestamp":       datetime.now(timezone.utc).isoformat(),
         "topics":          topics,
         "topic":           topics[0] if topics else "",  # backwards compatibility
         "sources_scanned": sources_used,

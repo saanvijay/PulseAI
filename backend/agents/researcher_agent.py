@@ -9,7 +9,7 @@ import sys
 import urllib.parse
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
@@ -210,7 +210,7 @@ def fetch_latest_ai_concepts(topic: str = "") -> dict:
     print(f"\n  {len(unique_articles)} unique articles collected from {len(sources_used)} sources.", flush=True)
 
     output = {
-        "timestamp":        datetime.utcnow().isoformat(),
+        "timestamp":        datetime.now(timezone.utc).isoformat(),
         "topic":            topic or "Latest AI updates",
         "total":            len(unique_articles),
         "sources_searched": sources_used,

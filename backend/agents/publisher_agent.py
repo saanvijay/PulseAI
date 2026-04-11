@@ -5,7 +5,7 @@ import json
 import os
 import smtplib
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from pathlib import Path
@@ -36,7 +36,7 @@ def send_email(subject: str, body: str) -> dict:
         server.login(os.environ["EMAIL_USER"], os.environ["EMAIL_PASS"])
         server.sendmail(os.environ["EMAIL_USER"], os.environ["EMAIL_TO"], msg.as_string())
 
-    return {"messageId": f"<{datetime.utcnow().timestamp()}@gmail.com>"}
+    return {"messageId": f"<{datetime.now(timezone.utc).timestamp()}@gmail.com>"}
 
 # ── LinkedIn UGC Posts API ─────────────────────────────────────────────────────
 
@@ -84,7 +84,7 @@ def publish_results() -> dict:
     final_summary = input_data["final_summary"]
 
     results = {
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "email":     {"status": "skipped"},
         "linkedin":  {"status": "skipped"},
     }

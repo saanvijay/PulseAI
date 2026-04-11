@@ -7,7 +7,7 @@
 
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
@@ -163,7 +163,7 @@ def summarize_with_multiple_models() -> dict:
     final_summary = create_final_summary(report, model_responses)
 
     output = {
-        "timestamp":        datetime.utcnow().isoformat(),
+        "timestamp":        datetime.now(timezone.utc).isoformat(),
         "models_queried":   len(OLLAMA_MODELS),
         "models_successful": success_count,
         "model_responses":  model_responses,

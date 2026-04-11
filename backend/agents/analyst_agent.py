@@ -1,9 +1,10 @@
-# Agent 2: Organize raw AI news into a structured 8-section technical report
+# Agent 2: Organize raw AI news into a structured technical report
 # using a local Ollama model via CrewAI.
+# Section headings are derived from the content itself — not a fixed template.
 
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from crewai import Agent, Crew, LLM, Task
@@ -37,12 +38,16 @@ def organize_content() -> dict:
 
     llm = LLM(model=f"ollama/{OLLAMA_MODEL}", base_url=OLLAMA_BASE_URL)
 
+    topic = raw_data.get("topic", "Latest AI updates")
+
     analyst = Agent(
         role="Senior AI Research Analyst",
-        goal="Produce a comprehensive, structured technical report from AI news articles",
+        goal="Produce a comprehensive, insightful technical report from AI news articles using headings that best fit the content",
         backstory=(
             "You are a senior AI researcher with deep expertise in machine learning, "
-            "LLMs, and AI systems. You write clear, insightful technical reports in English only."
+            "LLMs, and AI systems. You write clear, insightful technical reports in English only. "
+            "You never use a fixed template — you read the content first, then decide what sections "
+            "will best capture the story the articles are telling."
         ),
         llm=llm,
         verbose=False,
@@ -51,47 +56,25 @@ def organize_content() -> dict:
     task = Task(
         description=f"""IMPORTANT: Respond in English only. Do not use any other language.
 
-Based on the following AI news articles, create a comprehensive structured technical report.
+Topic: {topic}
+
+Read the following AI news articles carefully, then write a comprehensive technical report about them.
 
 ARTICLES:
 {articles_text}
 
-Create a detailed report with EXACTLY these 8 sections:
-
-1. **Introduction**
-   - Overview of the latest trends found in the articles
-   - Why this matters to the AI community
-
-2. **Existing Problems**
-   - Key challenges and limitations currently faced in AI
-   - Problems that motivated these new developments
-
-3. **Proposed Solutions**
-   - New approaches, methods, or models introduced
-   - How they address the existing problems
-
-4. **Architecture Overview**
-   - A simple ASCII diagram showing how the new AI systems work
-   - Key components and their relationships
-
-5. **Advantages**
-   - Benefits of the new developments
-   - What improvements they bring
-
-6. **Disadvantages**
-   - Limitations, risks, or concerns
-   - What still needs to be solved
-
-7. **Applied AI Use Cases**
-   - Real-world applications of these developments
-   - Industries that will benefit
-
-8. **Future Implementation**
-   - What to expect next in AI
-   - Predictions and upcoming milestones
-
-Keep each section concise but informative. Use bullet points where appropriate.""",
-        expected_output="A markdown-formatted 8-section technical report covering the AI news.",
+Instructions:
+- Decide 6 to 9 section headings yourself based on what themes, patterns, and stories actually emerge from these articles.
+- Do NOT use a fixed or pre-defined set of headings like "Introduction / Advantages / Disadvantages".
+- Headings should be specific and descriptive — they should reflect the actual content, not generic categories.
+  Good examples: "The Shift Toward Smaller, Efficient Models", "Why Context Windows Now Matter More Than Parameters",
+  "How Three Labs Are Racing Toward the Same Goal", "The Open-Source vs. Closed-Source Tension".
+  Bad examples: "Introduction", "Advantages", "Conclusion".
+- Each section should be substantive: 3-6 bullet points or 2-4 sentences of real analysis, not just restatements.
+- Reference specific models, companies, researchers, or numbers from the articles where relevant.
+- Use markdown formatting with `##` for section headings.
+- End with one short section that names the most important unanswered question raised by these articles.""",
+        expected_output="A markdown-formatted technical report with 6-9 content-driven section headings derived from the articles.",
         agent=analyst,
     )
 
@@ -100,13 +83,14 @@ Keep each section concise but informative. Use bullet points where appropriate."
     report = str(result)
 
     output = {
-        "timestamp":       datetime.utcnow().isoformat(),
+        "timestamp":       datetime.now(timezone.utc).isoformat(),
+        "topic":           topic,
         "source_articles": len(articles),
         "report":          report,
     }
 
     OUTPUT_FILE.write_text(json.dumps(output, indent=2))
-    print("Agent 2: Done! Report organized with 8 sections.")
+    print("Agent 2: Done! Report generated with content-driven sections.")
     return output
 
 
