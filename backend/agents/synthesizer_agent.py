@@ -54,12 +54,16 @@ def ask_ollama(model: str, prompt: str, max_tokens: int = 1024) -> str:
 
 # ── Per-model call with error handling ────────────────────────────────────────
 
-def call_model(name: str, model: str, report: str) -> dict:
+def call_model(name: str, model: str, report: str, topic: str = "") -> dict:
     try:
         print(f"  Asking {name}...")
+        topic_line = f'The research topic is: "{topic}"\n\n' if topic else ""
         prompt = (
             "IMPORTANT: Respond in English only. Do not use any other language.\n\n"
-            "You are an expert AI research analyst. Analyse the following AI report in depth and provide:\n\n"
+            f"{topic_line}"
+            "You are an expert AI research analyst. Analyse the following AI report in depth "
+            f"{'focusing specifically on the topic above ' if topic else ''}"
+            "and provide:\n\n"
             "1. **Key Developments** — The most significant breakthroughs or announcements and why they matter\n"
             "2. **Technical Insights** — Notable technical details, architectural choices, or methodology advances\n"
             "3. **Industry Impact** — How these developments affect companies, researchers, and end users\n"
@@ -76,7 +80,7 @@ def call_model(name: str, model: str, report: str) -> dict:
 
 # ── Consolidation via CrewAI + Ollama ─────────────────────────────────────────
 
-def create_final_summary(report: str, model_responses: list[dict]) -> str:
+def create_final_summary(report: str, model_responses: list[dict], topic: str = "") -> str:
     successful    = [r for r in model_responses if r["status"] == "success"]
     responses_text = "\n\n---\n\n".join(
         f"[{r['model']}]:\n{r['summary']}" for r in successful
@@ -95,11 +99,14 @@ def create_final_summary(report: str, model_responses: list[dict]) -> str:
         verbose=False,
     )
 
+    topic_line = f'Research topic: "{topic}"\n\n' if topic else ""
+    topic_focus = f" Everything must stay focused on the research topic: **{topic}**." if topic else ""
+
     task = Task(
         description=f"""IMPORTANT: Respond in English only. Do not use any other language.
 
-You have received in-depth analyses of an AI report from {len(successful)} different AI models.
-Your task is to produce ONE comprehensive, well-structured final summary that synthesises the best insights from all of them.
+{topic_line}You have received in-depth analyses of an AI report from {len(successful)} different AI models.
+Your task is to produce ONE comprehensive, well-structured final summary that synthesises the best insights from all of them.{topic_focus}
 
 ORIGINAL REPORT:
 {report}
@@ -110,7 +117,7 @@ MODEL ANALYSES:
 Write a final summary structured with these sections:
 
 ## Overview
-2-3 sentences capturing the overall theme and significance of this week's AI developments.
+2-3 sentences capturing the overall theme and significance of the findings{"related to " + topic if topic else ""}.
 
 ## Key Breakthroughs
 The most important advances — be specific about models, companies, benchmarks, or papers mentioned.
@@ -128,6 +135,7 @@ Honest assessment of what's missing, what could go wrong, and unsolved problems.
 The 3-5 most important things to follow up on in the coming weeks.
 
 Guidelines:
+- Stay focused on the topic throughout — every section should tie back to "{topic if topic else 'the research topic'}"
 - Be specific — name models, companies, researchers, and numbers from the report
 - Aim for 600-800 words total
 - Use bullet points within sections where appropriate
@@ -149,10 +157,14 @@ def summarize_with_multiple_models() -> dict:
 
     input_data = json.loads(INPUT_FILE.read_text())
     report     = input_data["report"]
+    topic      = input_data.get("topic", "")
+
+    if topic:
+        print(f"  Topic: \"{topic}\"")
 
     # Call each model sequentially (Ollama is local — parallel adds no benefit)
     model_responses = [
-        call_model(m["name"], m["model"], report)
+        call_model(m["name"], m["model"], report, topic)
         for m in OLLAMA_MODELS
     ]
 
@@ -160,7 +172,7 @@ def summarize_with_multiple_models() -> dict:
     print(f"  {success_count}/{len(OLLAMA_MODELS)} models responded successfully.")
 
     print("  Creating final consolidated summary...")
-    final_summary = create_final_summary(report, model_responses)
+    final_summary = create_final_summary(report, model_responses, topic)
 
     output = {
         "timestamp":        datetime.now(timezone.utc).isoformat(),

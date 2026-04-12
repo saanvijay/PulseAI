@@ -95,7 +95,9 @@ _HEADERS   = {"User-Agent": "Mozilla/5.0"}
 
 def gnews_search(source: dict, topic: str, max_results: int = ARTICLES_PER_SOURCE) -> tuple[dict, list[dict]]:
     """Fetch articles for one source. Returns (source, articles)."""
-    query = f"{topic} {source['query']}" if topic else source["query"]
+    # When a topic is set, search "{topic} {source label}" — keeps the query
+    # tight and topic-focused rather than mixing in the generic source query string.
+    query = f"{topic} {source['label']}" if topic else source["query"]
     try:
         url  = f"{_GNEWS_RSS}?q={urllib.parse.quote(query)}&hl=en-US&gl=US&ceid=US:en"
         resp = requests.get(url, headers=_HEADERS, timeout=15)
