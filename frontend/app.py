@@ -81,33 +81,30 @@ def status_badge(status):
     return status
 
 
-# ── Layout: left controls | right live log ────────────────────────────────────
+# ── State ─────────────────────────────────────────────────────────────────────
 
 state = get_agent_state()
 busy  = state["running"] is not None
 
-st.markdown("""
-<style>
-div[data-testid="stColumn"]:has(span.btn-agent) [data-testid="stButton"] button {
-    background-color: #555555 !important;
-    border-color: #555555 !important;
-    color: white !important;
-}
-div[data-testid="stColumn"]:has(span.btn-agent) [data-testid="stButton"] button:hover {
-    background-color: #444444 !important;
-    border-color: #444444 !important;
-}
-</style>
-""", unsafe_allow_html=True)
+st.title("🤖 PulseAI")
 
-left, right = st.columns([1, 1], gap="large")
+# ── Tabs ──────────────────────────────────────────────────────────────────────
+
+tab_main, tab_researcher, tab_analyst, tab_synthesizer, tab_publisher, tab_log = st.tabs([
+    "🏠 Pipeline",
+    "🔎 Researcher",
+    "📋 Analyst",
+    "🧠 Synthesizer",
+    "📤 Publisher",
+    "📡 Log",
+])
+
 
 # ══════════════════════════════════════════════════════════════════════════════
-# LEFT — Controls
+# TAB 1 — Pipeline controls
 # ══════════════════════════════════════════════════════════════════════════════
 
-with left:
-    st.title("🤖 PulseAI")
+with tab_main:
     st.markdown(
         "A **4-agent AI pipeline** powered by **CrewAI + Ollama** that fetches the latest AI news, "
         "organizes it into a structured report, summarizes it across multiple local models, "
@@ -119,6 +116,8 @@ with left:
     # Topic + Trend Agent
     st.markdown("##### Research Topic")
     topic = st.session_state.topic
+    if topic:
+        st.info(f"Current topic: **{topic}**")
 
     if st.button("🔍 Trend Agent — Auto-detect Topic", use_container_width=True, disabled=busy):
         st.session_state.trend_topics = []
@@ -139,11 +138,18 @@ with left:
 
     st.divider()
 
+    # Full pipeline
+    if st.button("🚀 Run Full Pipeline", use_container_width=True, type="primary", disabled=busy):
+        args = (topic,) if topic else ()
+        launch_agent("Full Pipeline", os.path.join(BACKEND_DIR, "orchestrator.py"), args)
+        st.rerun()
+
+    st.divider()
+
     # Individual agent buttons
     st.markdown("##### Run Individual Agents")
-    a_col, b_col = st.columns(2)
-    with a_col:
-        st.markdown('<span class="btn-agent"></span>', unsafe_allow_html=True)
+    c1, c2 = st.columns(2)
+    with c1:
         if st.button("🔎 Researcher",  use_container_width=True, disabled=busy):
             args = (topic,) if topic else ()
             launch_agent("Researcher Agent", os.path.join(BACKEND_DIR, "agents/researcher_agent.py"), args)
@@ -151,8 +157,7 @@ with left:
         if st.button("🧠 Synthesizer", use_container_width=True, disabled=busy):
             launch_agent("Synthesizer Agent", os.path.join(BACKEND_DIR, "agents/synthesizer_agent.py"))
             st.rerun()
-    with b_col:
-        st.markdown('<span class="btn-agent"></span>', unsafe_allow_html=True)
+    with c2:
         if st.button("📋 Analyst",   use_container_width=True, disabled=busy):
             launch_agent("Analyst Agent", os.path.join(BACKEND_DIR, "agents/analyst_agent.py"))
             st.rerun()
@@ -162,86 +167,28 @@ with left:
 
     st.divider()
 
-    # Full pipeline
-    if st.button("🚀 Run Full Pipeline", use_container_width=True, type="primary", disabled=busy):
-        args = (topic,) if topic else ()
-        launch_agent("Full Pipeline", os.path.join(BACKEND_DIR, "orchestrator.py"), args)
-        st.rerun()
-
     if st.button("🔄 Refresh Results", use_container_width=True, disabled=busy):
         st.rerun()
 
+    # Running indicator
+    if busy:
+        st.info(f"⏳ Running: **{state['running']}** — check the **Log** tab for live output.")
+
 
 # ══════════════════════════════════════════════════════════════════════════════
-# RIGHT — Live log window
+# TAB 2 — Researcher
 # ══════════════════════════════════════════════════════════════════════════════
-
-with right:
-    agent_name = state["running"]
-    logs       = state["logs"]
-    done       = state["done"]
-
-    if agent_name:
-        hdr, stop_btn = st.columns([4, 1])
-        hdr.markdown(f"##### 📡 {agent_name} — Live Log")
-        if stop_btn.button("⏹ Stop", use_container_width=True, type="secondary"):
-            proc = state["process"]
-            if proc:
-                proc.terminate()
-            state["running"] = None
-            state["done"]    = False
-            st.rerun()
-    elif logs:
-        last       = logs[-1] if logs else ""
-        last_agent = state.get("last_agent", "Agent")
-        if "error" in last.lower() or "failed" in last.lower():
-            st.markdown(f"##### 📡 {last_agent} — Live Log")
-            st.error("❌ Agent failed.")
-        else:
-            st.markdown(f"##### 📡 {last_agent} — Live Log")
-            st.success("✅ Done!")
-    else:
-        st.markdown("##### 📋 Live Log")
-        st.caption("Logs will appear here when an agent is running.")
-
-    # Log display in a fixed-height scrollable box
-    log_box = st.container(height=520, border=True)
-    with log_box:
-        if logs:
-            st.code("\n".join(logs), language="bash")
-        else:
-            st.markdown(" ")   # keep the box visible when empty
-
-    # Auto-refresh while running; one final rerun when done
-    if agent_name:
-        time.sleep(0.5)
-        st.rerun()
-    elif done:
-        if state.get("last_agent") == "Trend Agent":
-            trend = load_json("trend_output.json")
-            if trend and trend.get("topics"):
-                st.session_state.trend_topics = trend["topics"]
-        state["done"] = False
-        time.sleep(0.3)
-        st.rerun()
-
-
-# ── Agent output sections ─────────────────────────────────────────────────────
-
-st.divider()
-
-# ── Researcher ────────────────────────────────────────────────────────────────
 
 CATEGORY_ICONS = {"research": "🔬", "lab_blogs": "🏢", "newsletters": "📬", "news": "📰", "community": "💬"}
 
-with st.expander("📰 Researcher Agent — Fetched Articles", expanded=True):
+with tab_researcher:
+    st.markdown("### 📰 Researcher Agent — Fetched Articles")
     data = load_json("researcher_output.json")
     if data is None:
         st.info("No data yet. Run the Researcher agent.")
     else:
-        sources = data.get("sources_searched", [])
-        st.caption(f"Last run: {data.get('timestamp','?')}  |  Articles: {data.get('total',0)}  |  Sources: {len(sources)}")
-        articles = data.get("articles", [])
+        st.caption(f"Last run: {data.get('timestamp','?')}  |  Articles: {data.get('total',0)}  |  Sources: {len(data.get('sources_searched', []))}")
+        articles   = data.get("articles", [])
         categories = {}
         for a in articles:
             categories.setdefault(a.get("category", "news"), []).append(a)
@@ -255,9 +202,13 @@ with st.expander("📰 Researcher Agent — Fetched Articles", expanded=True):
                     if a.get("date"):  st.markdown(f"**Date:** {a['date']}")
                     if a.get("link"):  st.markdown(f"[🔗 Read more]({a['link']})")
 
-# ── Analyst ───────────────────────────────────────────────────────────────────
 
-with st.expander("📋 Analyst Agent — Structured Report", expanded=False):
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 3 — Analyst
+# ══════════════════════════════════════════════════════════════════════════════
+
+with tab_analyst:
+    st.markdown("### 📋 Analyst Agent — Structured Report")
     data = load_json("analyst_output.json")
     if data is None:
         st.info("No data yet. Run the Analyst agent.")
@@ -265,9 +216,13 @@ with st.expander("📋 Analyst Agent — Structured Report", expanded=False):
         st.caption(f"Last run: {data.get('timestamp','?')}  |  Based on {data.get('source_articles',0)} articles")
         st.markdown(data.get("report", "No report found."))
 
-# ── Synthesizer ───────────────────────────────────────────────────────────────
 
-with st.expander("🧠 Synthesizer Agent — Multi-Model Summary", expanded=False):
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 4 — Synthesizer
+# ══════════════════════════════════════════════════════════════════════════════
+
+with tab_synthesizer:
+    st.markdown("### 🧠 Synthesizer Agent — Multi-Model Summary")
     data = load_json("synthesizer_output.json")
     if data is None:
         st.info("No data yet. Run the Synthesizer agent.")
@@ -284,15 +239,70 @@ with st.expander("🧠 Synthesizer Agent — Multi-Model Summary", expanded=Fals
                     if r["status"] == "success": st.markdown(r["summary"])
                     else: st.error(r.get("error", "Unknown error"))
 
-# ── Publisher ─────────────────────────────────────────────────────────────────
 
-with st.expander("📤 Publisher Agent — Final Article", expanded=True):
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 5 — Publisher
+# ══════════════════════════════════════════════════════════════════════════════
+
+with tab_publisher:
+    st.markdown("### 📤 Publisher Agent — Final Article")
     data = load_json("publisher_output.json")
     if data is None:
         st.info("No data yet. Run the Publisher agent.")
     else:
         st.caption(f"Last run: {data.get('timestamp','?')}")
-        st.markdown("#### 📝 Final Article")
         st.markdown("> Copy and paste this article to LinkedIn, Medium, Substack, or any blog platform.")
         article = data.get("final_article", "")
-        st.text_area("Article", value=article, height=400, disabled=True)
+        st.text_area("Article", value=article, height=500, disabled=True)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 6 — Log
+# ══════════════════════════════════════════════════════════════════════════════
+
+with tab_log:
+    agent_name = state["running"]
+    logs       = state["logs"]
+
+    if agent_name:
+        hdr, stop_btn = st.columns([4, 1])
+        hdr.markdown(f"##### 📡 {agent_name} — Live Log")
+        if stop_btn.button("⏹ Stop", use_container_width=True, type="secondary"):
+            proc = state["process"]
+            if proc:
+                proc.terminate()
+            state["running"] = None
+            state["done"]    = False
+            st.rerun()
+    elif logs:
+        last_agent = state.get("last_agent", "Agent")
+        last       = logs[-1] if logs else ""
+        st.markdown(f"##### 📡 {last_agent} — Log")
+        if "error" in last.lower() or "failed" in last.lower():
+            st.error("❌ Agent failed.")
+        else:
+            st.success("✅ Done!")
+    else:
+        st.markdown("##### 📋 Log")
+        st.caption("Logs will appear here when an agent is running.")
+
+    log_box = st.container(height=560, border=True)
+    with log_box:
+        if logs:
+            st.code("\n".join(logs), language="bash")
+        else:
+            st.markdown(" ")
+
+# ── Auto-refresh ──────────────────────────────────────────────────────────────
+
+if agent_name:
+    time.sleep(0.5)
+    st.rerun()
+elif state["done"]:
+    if state.get("last_agent") == "Trend Agent":
+        trend = load_json("trend_output.json")
+        if trend and trend.get("topics"):
+            st.session_state.trend_topics = trend["topics"]
+    state["done"] = False
+    time.sleep(0.3)
+    st.rerun()
