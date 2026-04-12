@@ -111,7 +111,7 @@ with left:
     st.markdown(
         "A **4-agent AI pipeline** powered by **CrewAI + Ollama** that fetches the latest AI news, "
         "organizes it into a structured report, summarizes it across multiple local models, "
-        "and publishes the result via Email and LinkedIn."
+        "and displays a ready-to-publish article."
     )
 
     st.divider()
@@ -286,24 +286,13 @@ with st.expander("🧠 Synthesizer Agent — Multi-Model Summary", expanded=Fals
 
 # ── Publisher ─────────────────────────────────────────────────────────────────
 
-with st.expander("📤 Publisher Agent — Email & LinkedIn", expanded=False):
+with st.expander("📤 Publisher Agent — Final Article", expanded=True):
     data = load_json("publisher_output.json")
     if data is None:
         st.info("No data yet. Run the Publisher agent.")
     else:
         st.caption(f"Last run: {data.get('timestamp','?')}")
-        c1, c2 = st.columns(2)
-        with c1:
-            st.markdown("#### 📧 Email")
-            email = data.get("email", {})
-            st.markdown(f"**Status:** {status_badge(email.get('status','unknown'))}")
-            if email.get("messageId"): st.markdown(f"**Message ID:** `{email['messageId']}`")
-            if email.get("error"):     st.error(email["error"])
-        with c2:
-            st.markdown("#### 💼 LinkedIn")
-            li = data.get("linkedin", {})
-            st.markdown(f"**Status:** {status_badge(li.get('status','unknown'))}")
-            if li.get("postId"):  st.markdown(f"**Post ID:** `{li['postId']}`")
-            if li.get("error"):   st.error(li["error"])
-        st.markdown("#### 📝 LinkedIn Post Preview")
-        st.text_area("Post content", value=data.get("linkedin_post_preview",""), height=200, disabled=True)
+        st.markdown("#### 📝 Final Article")
+        st.markdown("> Copy and paste this article to LinkedIn, Medium, Substack, or any blog platform.")
+        article = data.get("final_article", "")
+        st.text_area("Article", value=article, height=400, disabled=True)

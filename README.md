@@ -1,6 +1,6 @@
 # 🤖 PulseAI — Latest AI Updates Pipeline
 
-A multi-agent system that automatically fetches, organizes, summarizes, and publishes the latest AI developments — running entirely on **local models** via **CrewAI + Ollama**. No cloud AI API keys required.
+A multi-agent system that automatically fetches, organizes, summarizes, and displays a ready-to-publish article on the latest AI developments — running entirely on **local models** via **CrewAI + Ollama**. No cloud AI API keys required.
 
 ---
 
@@ -34,8 +34,8 @@ Web Sources (Google News RSS)
                             ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │  Agent 4: Publisher                                             │
-│  → Sends the summary via Email (Gmail)                          │
-│  → Posts to LinkedIn                                            │
+│  → Displays the final article                                   │
+│  → Ready to publish on LinkedIn, Medium, or any blog           │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -53,7 +53,7 @@ PulseAI/
 │   │   ├── researcher_agent.py   # Google News RSS + Ollama curation
 │   │   ├── analyst_agent.py      # CrewAI + Ollama 8-section report
 │   │   ├── synthesizer_agent.py  # 5 local Ollama models + consolidation
-│   │   ├── publisher_agent.py    # Email (smtplib) + LinkedIn API
+│   │   ├── publisher_agent.py    # Displays the final article
 │   │   └── trend_agent.py        # Google News RSS + Ollama trend detection
 │   ├── output/                   # JSON outputs (created at runtime, gitignored)
 │   ├── tests/
@@ -133,21 +133,7 @@ Open `.env` and add the following:
 # ── Ollama (local — no API key needed) ────────────────────────────
 OLLAMA_MODEL=llama3.2
 OLLAMA_BASE_URL=http://localhost:11434
-
-# ── Email via Gmail (optional — Agent 4) ─────────────────────────
-# Use a Gmail App Password, NOT your account password.
-# Enable at: myaccount.google.com → Security → App Passwords
-EMAIL_USER=your_email@gmail.com
-EMAIL_PASS=your_gmail_app_password
-EMAIL_TO=recipient@example.com
-
-# ── LinkedIn (optional — Agent 4) ────────────────────────────────
-# See the LinkedIn Setup section below.
-LINKEDIN_ACCESS_TOKEN=your_linkedin_access_token
-LINKEDIN_PERSON_ID=your_linkedin_person_id
 ```
-
-> **Note:** Email and LinkedIn are optional. If their keys are not set, Agent 4 skips those steps gracefully.
 
 ---
 
@@ -233,7 +219,7 @@ uv run pytest ../backend/tests/test_integration.py -v
 | `test_researcher_agent.py` | 9 | Google News search, article curation, topic injection, JSON fallback, file output |
 | `test_analyst_agent.py` | 6 | Report schema, article count, file output, missing input error |
 | `test_synthesizer_agent.py` | 13 | Ollama HTTP calls, per-model success/error, final consolidation, model counts |
-| `test_publisher_agent.py` | 12 | LinkedIn post formatting, SMTP email, API calls, env var gating, error handling |
+| `test_publisher_agent.py` | 12 | Article display, output file writing, result structure |
 | `test_trend_agent.py` | 9 | Google News search, topic extraction, quote stripping, empty results, file output |
 | `test_integration.py` | 8 | Full pipeline sequence, inter-agent data flow, output schemas, topic arg, credentials, dependency chain |
 
@@ -296,20 +282,14 @@ Agent 2 uses Ollama to structure raw articles into a standardized 8-section repo
 
 ---
 
-## LinkedIn Setup
+## Publishing the Article
 
-LinkedIn requires a one-time OAuth 2.0 setup:
+Agent 4 outputs a polished article to the console and saves it to `backend/output/publisher_output.json`. You can use this article to:
 
-1. Go to the [LinkedIn Developer Portal](https://www.linkedin.com/developers/) and create an app
-2. Add the `w_member_social` and `r_liteprofile` OAuth scopes
-3. Use the **OAuth 2.0 tools** tab in the portal to generate an access token
-4. Find your Person ID:
-   ```bash
-   curl -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
-        https://api.linkedin.com/v2/me
-   ```
-   The `id` field in the response is your `LINKEDIN_PERSON_ID`
-5. Add both values to `PulseAI/.env`
+- **LinkedIn** — copy and paste into a new LinkedIn post
+- **Medium / Substack / Dev.to** — paste directly as a blog post
+- **Email newsletter** — drop into your preferred email tool
+- **Any other platform** — the article is plain text, ready to go anywhere
 
 ---
 
@@ -321,5 +301,4 @@ LinkedIn requires a one-time OAuth 2.0 setup:
 | Local LLMs | Ollama (llama3.2, mistral, qwen2.5, phi3, gemma2) |
 | Web search | Google News RSS (no API key required) |
 | Dashboard | Streamlit (managed with uv) |
-| Email | Python smtplib (Gmail) |
-| Social | LinkedIn UGC Posts API v2 |
+| Output | Plain-text article (publish anywhere) |
