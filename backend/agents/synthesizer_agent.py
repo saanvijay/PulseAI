@@ -205,6 +205,7 @@ def summarize_with_multiple_models() -> dict:
 
     output = {
         "timestamp":         datetime.now(timezone.utc).isoformat(),
+        "topic":             topic,
         "models_queried":    len(OLLAMA_MODELS),
         "models_successful": success_count,
         "model_responses":   model_responses,

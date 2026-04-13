@@ -24,10 +24,14 @@ OUTPUT_DIR  = os.path.join(BACKEND_DIR, "output")
 
 # ── Session state ─────────────────────────────────────────────────────────────
 
-if "topic" not in st.session_state:
-    st.session_state.topic = ""
-if "trend_topics" not in st.session_state:
-    st.session_state.trend_topics = []
+for key, default in [
+    ("topic",              ""),
+    ("trend_topics",       []),
+    ("research_mode",      False),
+    ("research_gap_items", []),   # list of {topic, gap} dicts from research_gap_agent
+]:
+    if key not in st.session_state:
+        st.session_state[key] = default
 
 
 # ── Shared agent state (cache_resource = safe for background threads) ─────────
@@ -47,6 +51,14 @@ def load_json(filename):
         return json.load(f)
 
 
+# Maps orchestrator step prefixes → display names
+_STEP_LABELS = {
+    "[Step 1/4]": "Researcher Agent",
+    "[Step 2/4]": "Analyst Agent",
+    "[Step 3/4]": "Synthesizer Agent",
+    "[Step 4/4]": "Publisher Agent",
+}
+
 def _agent_thread(agent_name, script_path, extra_args=()):
     state = get_agent_state()
     cmd   = [sys.executable, "-u", script_path, *extra_args]
@@ -60,6 +72,12 @@ def _agent_thread(agent_name, script_path, extra_args=()):
         line = raw.rstrip()
         if line:
             state["logs"].append(line)
+            # Update the displayed agent name as each pipeline step starts
+            if agent_name in ("Full Pipeline", "Research Pipeline"):
+                for prefix, label in _STEP_LABELS.items():
+                    if line.startswith(prefix):
+                        state["running"] = f"{agent_name} — {label}"
+                        break
     proc.stdout.close()
     proc.wait()
     state["running"]    = None
@@ -108,19 +126,72 @@ with tab_main:
     st.markdown(
         "A **4-agent AI pipeline** powered by **CrewAI + Ollama** that fetches the latest AI news, "
         "organizes it into a structured report, summarizes it across multiple local models, "
-        "and displays a ready-to-publish article."
+        "and displays a ready-to-publish article or ArXiv research paper."
     )
 
     st.divider()
 
-    # Topic + Trend Agent
+    # ── Status indicators ─────────────────────────────────────────────────────
+    topic         = st.session_state.topic
+    research_mode = st.session_state.research_mode
+
+    si_col1, si_col2, si_col3 = st.columns(3)
+    with si_col1:
+        st.markdown("##### Current Agent")
+        if busy:
+            st.success(f"⚙️ Running: **{state['running']}**")
+        else:
+            last = state.get("last_agent")
+            if last:
+                st.info(f"✅ Last run: **{last}**")
+            else:
+                st.info("💤 Idle")
+    with si_col2:
+        st.markdown("##### Current Topic")
+        if topic:
+            st.success(f"🎯 {topic}")
+        else:
+            st.info("🌐 Latest AI updates (no topic set)")
+    with si_col3:
+        st.markdown("##### Output Mode")
+        if research_mode:
+            st.warning("🔬 Research Paper (ArXiv)")
+        else:
+            st.info("📰 Article (LinkedIn / Blog)")
+
+    st.divider()
+
+    # ── Topic input ───────────────────────────────────────────────────────────
     st.markdown("##### Research Topic")
-    topic = st.session_state.topic
-    if topic:
-        st.info(f"Current topic: **{topic}**")
+
+    typed = st.text_input(
+        "Enter a topic manually",
+        value=st.session_state.topic,
+        placeholder="e.g. LLM reasoning, multimodal models, AI agents…",
+        disabled=busy,
+        label_visibility="collapsed",
+    )
+    t_col1, t_col2 = st.columns(2)
+    with t_col1:
+        if st.button("✅ Set Topic", use_container_width=True, disabled=busy or not typed.strip()):
+            st.session_state.topic = typed.strip()
+            st.session_state.trend_topics = []
+            st.session_state.research_gap_items = []
+            st.rerun()
+    with t_col2:
+        if st.button("✖ Clear Topic", use_container_width=True, disabled=busy or not st.session_state.topic):
+            st.session_state.topic = ""
+            st.session_state.research_mode = False
+            st.rerun()
+
+    st.divider()
+
+    # ── Trending topics ───────────────────────────────────────────────────────
+    st.markdown("##### Option A — Trending Topics  *(auto-detect from news)*")
 
     if st.button("🔍 Trend Agent — Auto-detect Topic", use_container_width=True, disabled=busy):
         st.session_state.trend_topics = []
+        st.session_state.research_gap_items = []
         launch_agent("Trend Agent", os.path.join(BACKEND_DIR, "agents/trend_agent.py"))
         st.rerun()
 
@@ -131,18 +202,66 @@ with tab_main:
             st.session_state.trend_topics,
             label_visibility="collapsed",
         )
-        if st.button("Use this topic", use_container_width=True):
+        if st.button("Use this topic", use_container_width=True, key="use_trend"):
             st.session_state.topic = chosen
+            st.session_state.research_mode = False
             st.session_state.trend_topics = []
             st.rerun()
 
     st.divider()
 
-    # Full pipeline
-    if st.button("🚀 Run Full Pipeline", use_container_width=True, type="primary", disabled=busy):
-        args = (topic,) if topic else ()
-        launch_agent("Full Pipeline", os.path.join(BACKEND_DIR, "orchestrator.py"), args)
+    # ── Research gap topics ───────────────────────────────────────────────────
+    st.markdown("##### Option B — Research Gap Topics  *(find unexplored areas in ArXiv papers)*")
+    st.caption("Scans recent ArXiv papers (cs.AI, cs.LG, cs.CL, cs.CV, stat.ML) and identifies genuine research gaps.")
+
+    gap_broad = st.text_input(
+        "Broad area (optional)",
+        placeholder="e.g. computer vision, NLP, reinforcement learning…",
+        disabled=busy,
+        key="gap_broad_input",
+        label_visibility="collapsed",
+    )
+
+    if st.button("🔬 Research Gap Agent — Find Gaps", use_container_width=True, disabled=busy):
+        st.session_state.trend_topics = []
+        st.session_state.research_gap_items = []
+        args = (gap_broad.strip(),) if gap_broad.strip() else ()
+        launch_agent("Research Gap Agent", os.path.join(BACKEND_DIR, "agents/research_gap_agent.py"), args)
         st.rerun()
+
+    if st.session_state.research_gap_items:
+        st.markdown("**Select a research gap topic:**")
+        gap_labels = [g["topic"] for g in st.session_state.research_gap_items]
+        chosen_idx = st.radio(
+            "gap_radio",
+            range(len(gap_labels)),
+            format_func=lambda i: gap_labels[i],
+            label_visibility="collapsed",
+        )
+        chosen_gap = st.session_state.research_gap_items[chosen_idx]
+        if chosen_gap.get("gap"):
+            st.caption(f"📌 Gap: {chosen_gap['gap']}")
+
+        if st.button("Use this research topic", use_container_width=True, key="use_gap"):
+            st.session_state.topic = chosen_gap["topic"]
+            st.session_state.research_mode = True
+            st.session_state.research_gap_items = []
+            st.session_state.trend_topics = []
+            st.rerun()
+
+    st.divider()
+
+    # ── Run buttons ───────────────────────────────────────────────────────────
+    if research_mode:
+        if st.button("🔬 Run Research Pipeline  (→ ArXiv Paper)", use_container_width=True, type="primary", disabled=busy):
+            args = (topic, "--research") if topic else ("--research",)
+            launch_agent("Research Pipeline", os.path.join(BACKEND_DIR, "orchestrator.py"), args)
+            st.rerun()
+    else:
+        if st.button("🚀 Run Full Pipeline  (→ Article)", use_container_width=True, type="primary", disabled=busy):
+            args = (topic,) if topic else ()
+            launch_agent("Full Pipeline", os.path.join(BACKEND_DIR, "orchestrator.py"), args)
+            st.rerun()
 
     st.divider()
 
@@ -162,7 +281,8 @@ with tab_main:
             launch_agent("Analyst Agent", os.path.join(BACKEND_DIR, "agents/analyst_agent.py"))
             st.rerun()
         if st.button("📤 Publisher", use_container_width=True, disabled=busy):
-            launch_agent("Publisher Agent", os.path.join(BACKEND_DIR, "agents/publisher_agent.py"))
+            agent_script = "agents/paper_writer_agent.py" if research_mode else "agents/publisher_agent.py"
+            launch_agent("Publisher Agent", os.path.join(BACKEND_DIR, agent_script))
             st.rerun()
 
     st.divider()
@@ -170,7 +290,6 @@ with tab_main:
     if st.button("🔄 Refresh Results", use_container_width=True, disabled=busy):
         st.rerun()
 
-    # Running indicator
     if busy:
         st.info(f"⏳ Running: **{state['running']}** — check the **Log** tab for live output.")
 
@@ -187,7 +306,13 @@ with tab_researcher:
     if data is None:
         st.info("No data yet. Run the Researcher agent.")
     else:
-        st.caption(f"Last run: {data.get('timestamp','?')}  |  Articles: {data.get('total',0)}  |  Sources: {len(data.get('sources_searched', []))}")
+        scraped = sum(1 for a in data.get("articles", []) if a.get("full_content"))
+        st.caption(
+            f"Last run: {data.get('timestamp','?')}  |  "
+            f"Articles: {data.get('total',0)}  |  "
+            f"Full content scraped: {scraped}  |  "
+            f"Sources: {len(data.get('sources_searched', []))}"
+        )
         articles   = data.get("articles", [])
         categories = {}
         for a in articles:
@@ -196,11 +321,18 @@ with tab_researcher:
             icon = CATEGORY_ICONS.get(cat, "📄")
             st.markdown(f"### {icon} {cat.replace('_',' ').title()} ({len(cat_articles)})")
             for i, a in enumerate(cat_articles, 1):
-                with st.expander(f"{i}. {a['title']}"):
+                label = f"{i}. {a['title']}"
+                if a.get("full_content"):
+                    label += " ✦"
+                with st.expander(label):
                     st.markdown(f"**Source:** {a.get('source','—')}")
-                    st.markdown(f"**Summary:** {a.get('snippet','—')}")
+                    if a.get("full_content"):
+                        st.markdown(f"**Content (scraped):** {a['full_content'][:300]}…")
+                    else:
+                        st.markdown(f"**Snippet:** {a.get('snippet','—')}")
                     if a.get("date"):  st.markdown(f"**Date:** {a['date']}")
                     if a.get("link"):  st.markdown(f"[🔗 Read more]({a['link']})")
+        st.caption("✦ = full article content scraped")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -245,35 +377,53 @@ with tab_synthesizer:
 # ══════════════════════════════════════════════════════════════════════════════
 
 with tab_publisher:
-    st.markdown("### 📤 Publisher Agent — Final Article")
     data = load_json("publisher_output.json")
+
+    is_research = data.get("mode") == "research" if data else False
+
+    if is_research:
+        st.markdown("### 🔬 Publisher Agent — ArXiv Research Paper")
+        st.markdown("> This paper was generated in **Research Mode**. Copy it to [arXiv](https://arxiv.org/), Overleaf, or any academic platform.")
+        if data.get("gap"):
+            st.info(f"📌 Research Gap Addressed: {data['gap']}")
+    else:
+        st.markdown("### 📤 Publisher Agent — Final Article")
+        st.markdown("> Copy and paste this article to LinkedIn, Medium, Substack, or any blog platform.")
+
     if data is None:
         st.info("No data yet. Run the Publisher agent.")
     else:
-        st.caption(f"Last run: {data.get('timestamp','?')}")
-        st.markdown("> Copy and paste this article to LinkedIn, Medium, Substack, or any blog platform.")
+        st.caption(f"Last run: {data.get('timestamp','?')}  |  Topic: {data.get('topic') or '—'}")
         article = data.get("final_article", "")
 
         if article:
             dl_col1, dl_col2 = st.columns(2)
+            ext  = "md" if not is_research else "tex"
+            mime = "text/markdown" if not is_research else "text/plain"
+            name = "pulseai_paper" if is_research else "pulseai_article"
             with dl_col1:
                 st.download_button(
-                    "📥 Download as Markdown",
+                    "📥 Download as Markdown" if not is_research else "📥 Download as LaTeX (.tex)",
                     data=article,
-                    file_name="pulseai_article.md",
-                    mime="text/markdown",
+                    file_name=f"{name}.{ext}",
+                    mime=mime,
                     use_container_width=True,
                 )
             with dl_col2:
                 st.download_button(
                     "📄 Download as Text",
                     data=article,
-                    file_name="pulseai_article.txt",
+                    file_name=f"{name}.txt",
                     mime="text/plain",
                     use_container_width=True,
                 )
 
-        st.text_area("Article", value=article, height=450, disabled=True)
+        st.text_area(
+            "ArXiv Paper" if is_research else "Article",
+            value=article,
+            height=550,
+            disabled=True,
+        )
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -319,10 +469,17 @@ if agent_name:
     time.sleep(0.5)
     st.rerun()
 elif state["done"]:
-    if state.get("last_agent") == "Trend Agent":
+    last_agent = state.get("last_agent", "")
+    if last_agent == "Trend Agent":
         trend = load_json("trend_output.json")
         if trend and trend.get("topics"):
-            st.session_state.trend_topics = trend["topics"]
+            st.session_state.trend_topics      = trend["topics"]
+            st.session_state.research_gap_items = []
+    elif last_agent == "Research Gap Agent":
+        gaps = load_json("research_gap_output.json")
+        if gaps and gaps.get("gaps"):
+            st.session_state.research_gap_items = gaps["gaps"]
+            st.session_state.trend_topics       = []
     state["done"] = False
     time.sleep(0.3)
     st.rerun()
