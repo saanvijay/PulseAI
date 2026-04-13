@@ -1,4 +1,4 @@
-# Research Gap Agent: Fetches recent ArXiv papers and uses Ollama to identify
+# Research Gap Agent: Fetches recent research papers and uses Ollama to identify
 # genuine research gaps — areas that exist but are underexplored or contradicted.
 # Output is a list of 5 gap topics the user can pick from, similar to Trend Agent.
 
@@ -31,12 +31,12 @@ ARXIV_API        = "http://export.arxiv.org/api/query"
 ARXIV_CATEGORIES = ["cs.AI", "cs.LG", "cs.CL", "cs.CV", "stat.ML"]
 PAPERS_PER_CAT   = 10
 
-# ── ArXiv fetcher ─────────────────────────────────────────────────────────────
+# ── Research paper fetcher ────────────────────────────────────────────────────
 
 _HEADERS = {"User-Agent": "Mozilla/5.0"}
 
 def fetch_arxiv(category: str, broad_topic: str = "", max_results: int = PAPERS_PER_CAT) -> tuple[str, list[dict]]:
-    """Fetch recent papers from one ArXiv category. Returns (category, papers)."""
+    """Fetch recent papers from one research paper category. Returns (category, papers)."""
     try:
         if broad_topic:
             query = f"cat:{category} AND ti:{urllib.parse.quote(broad_topic)}"
@@ -93,7 +93,7 @@ def find_gaps(papers: list[dict], broad_topic: str = "") -> list[dict]:
     task = Task(
         description=f"""IMPORTANT: Respond in English only.
 
-{topic_line}Below are recent ArXiv papers in AI/ML. Analyse them and identify 5 genuine research gaps — areas that are underexplored, missing, or where open questions remain unanswered.
+{topic_line}Below are recent research papers in AI/ML. Analyse them and identify 5 genuine research gaps — areas that are underexplored, missing, or where open questions remain unanswered.
 
 RECENT PAPERS:
 {papers_text}
@@ -130,7 +130,7 @@ Return exactly 5 lines. No extra text.""",
 # ── Main agent function ────────────────────────────────────────────────────────
 
 def discover_research_gaps(broad_topic: str = "") -> dict:
-    print("Research Gap Agent: Fetching recent ArXiv papers...", flush=True)
+    print("Research Gap Agent: Fetching recent research papers...", flush=True)
     if broad_topic:
         print(f"  Broad area: \"{broad_topic}\"", flush=True)
 

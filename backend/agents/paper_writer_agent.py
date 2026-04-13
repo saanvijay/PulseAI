@@ -1,5 +1,5 @@
 # Paper Writer Agent: Takes the synthesizer summary and the selected research gap,
-# and writes a full ArXiv-format research paper using CrewAI + Ollama.
+# and writes a full research paper using CrewAI + Ollama.
 
 import json
 import os
@@ -29,7 +29,7 @@ def write_arxiv_paper(topic: str, gap: str, related_work_summary: str) -> str:
 
     writer = Agent(
         role="AI Research Paper Author",
-        goal="Write a rigorous, well-structured ArXiv-format research paper that addresses an identified research gap",
+        goal="Write a rigorous, well-structured research paper that addresses an identified research gap",
         backstory=(
             "You are an expert AI researcher with a strong publication record at top venues "
             "(NeurIPS, ICML, ACL, ICCV). You write clearly, precisely, and with academic rigour. "
@@ -40,7 +40,7 @@ def write_arxiv_paper(topic: str, gap: str, related_work_summary: str) -> str:
     )
 
     task = Task(
-        description=f"""IMPORTANT: Respond in English only. Write a complete ArXiv-format research paper.
+        description=f"""IMPORTANT: Respond in English only. Write a complete research paper.
 
 Research Topic: {topic}
 Research Gap to Address: {gap}
@@ -90,7 +90,7 @@ List 6-10 plausible references in this format:
 [1] Author, A. et al. (Year). "Paper Title." Venue.
 
 Write in formal academic English. Be specific and technical. Do not add any meta-commentary outside the paper.""",
-        expected_output="A complete ArXiv-format research paper with Title, Abstract, and 6 numbered sections.",
+        expected_output="A complete research paper with Title, Abstract, and 6 numbered sections.",
         agent=writer,
     )
 
@@ -119,7 +119,7 @@ def _resolve_gap(topic: str) -> str:
 # ── Main agent function ────────────────────────────────────────────────────────
 
 def write_research_paper() -> dict:
-    print("Agent 4 (Research Mode): Writing ArXiv-format paper...", flush=True)
+    print("Agent 4 (Research Mode): Writing research paper...", flush=True)
 
     synth_data    = json.loads(SYNTH_FILE.read_text())
     final_summary = synth_data.get("final_summary", "")
@@ -139,7 +139,7 @@ def write_research_paper() -> dict:
     paper = write_arxiv_paper(topic, gap, final_summary)
 
     print("\n" + "=" * 60)
-    print("ARXIV RESEARCH PAPER")
+    print("RESEARCH PAPER")
     print("=" * 60)
     print(paper)
     print("=" * 60 + "\n")
@@ -154,7 +154,7 @@ def write_research_paper() -> dict:
     }
 
     OUTPUT_FILE.write_text(json.dumps(results, indent=2))
-    print("Agent 4: Done! ArXiv paper written.", flush=True)
+    print("Agent 4: Done! Research paper written.", flush=True)
     return results
 
 

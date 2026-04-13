@@ -2,7 +2,7 @@
 # Usage:
 #   python orchestrator.py                     # default pipeline
 #   python orchestrator.py "topic"             # with topic
-#   python orchestrator.py "topic" --research  # research / ArXiv paper mode
+#   python orchestrator.py "topic" --research  # research paper mode
 
 import sys
 import time
@@ -44,7 +44,7 @@ def run_pipeline(topic: str = "", research_mode: bool = False) -> None:
     print(f"  Completed in {time.time() - t3:.1f}s\n")
 
     if research_mode:
-        print("[Step 4/4] Paper Writer Agent: Writing ArXiv Paper")
+        print("[Step 4/4] Paper Writer Agent: Writing Research Paper")
         t4 = time.time()
         write_research_paper()
     else:

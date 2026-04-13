@@ -126,7 +126,7 @@ with tab_main:
     st.markdown(
         "A **4-agent AI pipeline** powered by **CrewAI + Ollama** that fetches the latest AI news, "
         "organizes it into a structured report, summarizes it across multiple local models, "
-        "and displays a ready-to-publish article or ArXiv research paper."
+        "and displays a ready-to-publish article or structured research paper."
     )
 
     st.divider()
@@ -155,105 +155,106 @@ with tab_main:
     with si_col3:
         st.markdown("##### Output Mode")
         if research_mode:
-            st.warning("🔬 Research Paper (ArXiv)")
+            st.warning("🔬 Research Paper")
         else:
             st.info("📰 Article (LinkedIn / Blog)")
 
     st.divider()
 
-    # ── Topic input ───────────────────────────────────────────────────────────
-    st.markdown("##### Research Topic")
+    # ── Topic selection — three inner tabs ────────────────────────────────────
+    st.markdown("##### Select Topic")
+    ttab_manual, ttab_trend, ttab_gap = st.tabs([
+        "✏️ Enter Manually",
+        "🔍 Trending Topics",
+        "🔬 Research Gap",
+    ])
 
-    typed = st.text_input(
-        "Enter a topic manually",
-        value=st.session_state.topic,
-        placeholder="e.g. LLM reasoning, multimodal models, AI agents…",
-        disabled=busy,
-        label_visibility="collapsed",
-    )
-    t_col1, t_col2 = st.columns(2)
-    with t_col1:
-        if st.button("✅ Set Topic", use_container_width=True, disabled=busy or not typed.strip()):
-            st.session_state.topic = typed.strip()
-            st.session_state.trend_topics = []
-            st.session_state.research_gap_items = []
-            st.rerun()
-    with t_col2:
-        if st.button("✖ Clear Topic", use_container_width=True, disabled=busy or not st.session_state.topic):
-            st.session_state.topic = ""
-            st.session_state.research_mode = False
-            st.rerun()
-
-    st.divider()
-
-    # ── Trending topics ───────────────────────────────────────────────────────
-    st.markdown("##### Option A — Trending Topics  *(auto-detect from news)*")
-
-    if st.button("🔍 Trend Agent — Auto-detect Topic", use_container_width=True, disabled=busy):
-        st.session_state.trend_topics = []
-        st.session_state.research_gap_items = []
-        launch_agent("Trend Agent", os.path.join(BACKEND_DIR, "agents/trend_agent.py"))
-        st.rerun()
-
-    if st.session_state.trend_topics:
-        st.markdown("**Select a trending topic:**")
-        chosen = st.radio(
-            "trending_radio",
-            st.session_state.trend_topics,
+    with ttab_manual:
+        st.caption("Type any topic and set it for the pipeline.")
+        typed = st.text_input(
+            "Topic",
+            value=st.session_state.topic,
+            placeholder="e.g. LLM reasoning, multimodal models, AI agents…",
+            disabled=busy,
             label_visibility="collapsed",
         )
-        if st.button("Use this topic", use_container_width=True, key="use_trend"):
-            st.session_state.topic = chosen
-            st.session_state.research_mode = False
+        t_col1, t_col2 = st.columns(2)
+        with t_col1:
+            if st.button("✅ Set Topic", use_container_width=True, disabled=busy or not typed.strip()):
+                st.session_state.topic = typed.strip()
+                st.session_state.research_mode = False
+                st.session_state.trend_topics = []
+                st.session_state.research_gap_items = []
+                st.rerun()
+        with t_col2:
+            if st.button("✖ Clear Topic", use_container_width=True, disabled=busy or not st.session_state.topic):
+                st.session_state.topic = ""
+                st.session_state.research_mode = False
+                st.rerun()
+
+    with ttab_trend:
+        st.caption("Auto-detect the most trending AI topics from live news sources.")
+        if st.button("🔍 Run Trend Agent", use_container_width=True, disabled=busy):
             st.session_state.trend_topics = []
+            st.session_state.research_gap_items = []
+            launch_agent("Trend Agent", os.path.join(BACKEND_DIR, "agents/trend_agent.py"))
             st.rerun()
+        if st.session_state.trend_topics:
+            st.markdown("**Select a trending topic:**")
+            chosen = st.radio(
+                "trending_radio",
+                st.session_state.trend_topics,
+                label_visibility="collapsed",
+            )
+            if st.button("Use this topic", use_container_width=True, key="use_trend"):
+                st.session_state.topic = chosen
+                st.session_state.research_mode = False
+                st.session_state.trend_topics = []
+                st.rerun()
+        elif not busy:
+            st.info("Click **Run Trend Agent** to fetch trending topics.")
 
-    st.divider()
-
-    # ── Research gap topics ───────────────────────────────────────────────────
-    st.markdown("##### Option B — Research Gap Topics  *(find unexplored areas in ArXiv papers)*")
-    st.caption("Scans recent ArXiv papers (cs.AI, cs.LG, cs.CL, cs.CV, stat.ML) and identifies genuine research gaps.")
-
-    gap_broad = st.text_input(
-        "Broad area (optional)",
-        placeholder="e.g. computer vision, NLP, reinforcement learning…",
-        disabled=busy,
-        key="gap_broad_input",
-        label_visibility="collapsed",
-    )
-
-    if st.button("🔬 Research Gap Agent — Find Gaps", use_container_width=True, disabled=busy):
-        st.session_state.trend_topics = []
-        st.session_state.research_gap_items = []
-        args = (gap_broad.strip(),) if gap_broad.strip() else ()
-        launch_agent("Research Gap Agent", os.path.join(BACKEND_DIR, "agents/research_gap_agent.py"), args)
-        st.rerun()
-
-    if st.session_state.research_gap_items:
-        st.markdown("**Select a research gap topic:**")
-        gap_labels = [g["topic"] for g in st.session_state.research_gap_items]
-        chosen_idx = st.radio(
-            "gap_radio",
-            range(len(gap_labels)),
-            format_func=lambda i: gap_labels[i],
+    with ttab_gap:
+        st.caption("Scan recent research papers and identify unexplored gaps. Output will be a structured research paper.")
+        gap_broad = st.text_input(
+            "Broad area (optional)",
+            placeholder="e.g. computer vision, NLP, reinforcement learning…",
+            disabled=busy,
+            key="gap_broad_input",
             label_visibility="collapsed",
         )
-        chosen_gap = st.session_state.research_gap_items[chosen_idx]
-        if chosen_gap.get("gap"):
-            st.caption(f"📌 Gap: {chosen_gap['gap']}")
-
-        if st.button("Use this research topic", use_container_width=True, key="use_gap"):
-            st.session_state.topic = chosen_gap["topic"]
-            st.session_state.research_mode = True
-            st.session_state.research_gap_items = []
+        if st.button("🔬 Run Research Gap Agent", use_container_width=True, disabled=busy):
             st.session_state.trend_topics = []
+            st.session_state.research_gap_items = []
+            args = (gap_broad.strip(),) if gap_broad.strip() else ()
+            launch_agent("Research Gap Agent", os.path.join(BACKEND_DIR, "agents/research_gap_agent.py"), args)
             st.rerun()
+        if st.session_state.research_gap_items:
+            st.markdown("**Select a research gap:**")
+            gap_labels = [g["topic"] for g in st.session_state.research_gap_items]
+            chosen_idx = st.radio(
+                "gap_radio",
+                range(len(gap_labels)),
+                format_func=lambda i: gap_labels[i],
+                label_visibility="collapsed",
+            )
+            chosen_gap = st.session_state.research_gap_items[chosen_idx]
+            if chosen_gap.get("gap"):
+                st.caption(f"📌 Gap: {chosen_gap['gap']}")
+            if st.button("Use this research topic", use_container_width=True, key="use_gap"):
+                st.session_state.topic = chosen_gap["topic"]
+                st.session_state.research_mode = True
+                st.session_state.research_gap_items = []
+                st.session_state.trend_topics = []
+                st.rerun()
+        elif not busy:
+            st.info("Click **Run Research Gap Agent** to discover research gaps.")
 
     st.divider()
 
     # ── Run buttons ───────────────────────────────────────────────────────────
     if research_mode:
-        if st.button("🔬 Run Research Pipeline  (→ ArXiv Paper)", use_container_width=True, type="primary", disabled=busy):
+        if st.button("🔬 Run Research Pipeline  (→ Research Paper)", use_container_width=True, type="primary", disabled=busy):
             args = (topic, "--research") if topic else ("--research",)
             launch_agent("Research Pipeline", os.path.join(BACKEND_DIR, "orchestrator.py"), args)
             st.rerun()
@@ -382,8 +383,8 @@ with tab_publisher:
     is_research = data.get("mode") == "research" if data else False
 
     if is_research:
-        st.markdown("### 🔬 Publisher Agent — ArXiv Research Paper")
-        st.markdown("> This paper was generated in **Research Mode**. Copy it to [arXiv](https://arxiv.org/), Overleaf, or any academic platform.")
+        st.markdown("### 🔬 Publisher Agent — Research Paper")
+        st.markdown("> This paper was generated in **Research Mode**. Copy it to any research paper platform, Overleaf, or your institution's repository.")
         if data.get("gap"):
             st.info(f"📌 Research Gap Addressed: {data['gap']}")
     else:
@@ -419,7 +420,7 @@ with tab_publisher:
                 )
 
         st.text_area(
-            "ArXiv Paper" if is_research else "Article",
+            "Research Paper" if is_research else "Article",
             value=article,
             height=550,
             disabled=True,
