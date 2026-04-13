@@ -1,6 +1,13 @@
-# 🤖 PulseAI — Latest AI Updates Pipeline
+# 🤖 PulseAI — AI Research & Content Pipeline
 
-A multi-agent system that automatically fetches, organizes, summarizes, and displays a ready-to-publish **article** or a **research paper draft** on the latest AI developments — running entirely on **local models** via **CrewAI + Ollama**. No cloud AI API keys required.
+PulseAI is a **multi-agent AI pipeline** that turns any topic into a ready-to-publish article or a structured research paper draft — running entirely on **local models** via **CrewAI + Ollama**, with optional cloud model support for higher quality output.
+
+It covers two distinct workflows:
+
+- **Article mode** — fetches live AI news, analyzes it with multiple LLMs in parallel, and produces a blog-ready article on any topic you choose (manual, trending, or AI-suggested)
+- **Research Paper mode** — discovers genuine unexplored research gaps from recent academic papers, then writes a structured paper draft addressing the selected gap (compact outline with local models, full 12–15 page academic paper with cloud models)
+
+No cloud API keys required to get started. Everything runs locally by default.
 
 ---
 
@@ -8,10 +15,18 @@ A multi-agent system that automatically fetches, organizes, summarizes, and disp
 
 | Mode | Topic source | Output |
 |------|-------------|--------|
-| **Article** | Trending topics or manual input | Blog post / LinkedIn article — ready to publish |
-| **Research Paper** | Research Gap Agent (unexplored areas in recent papers) | Draft outline (local) or full 12–15 page paper (cloud) — a starting point for your own real research |
+| **Article** | Manual input or Trend Agent (live AI news) | Blog post / LinkedIn article — ready to publish |
+| **Research Paper** | Manual input or Research Gap Agent (scans recent papers) | Compact 6-section draft (local) or full 12–15 page academic paper (cloud) |
 
-> **Important:** The Research Paper mode does **not** produce a publication-ready paper. It identifies a potential research gap and generates a structured draft to help you get started. The actual research, experiments, validation, and writing are yours to do before submitting anywhere.
+### Research Paper mode — what it does and what it doesn't
+
+The Research Paper pipeline:
+1. **Scans recent academic papers** across 5 AI/ML categories (cs.AI, cs.LG, cs.CL, cs.CV, stat.ML) — filtering by your topic if provided
+2. **Identifies 5 genuine research gaps** using a randomly rotated analytical lens (scalability, theoretical limits, safety, efficiency, etc.) so results differ each run
+3. You **select one gap** as the research direction
+4. The pipeline runs Researcher → Analyst → Synthesizer on that topic, then **writes a structured paper draft**
+
+> **This is a draft, not a finished paper.** The output gives you a structured starting point — a gap worth investigating, a proposed methodology, and a literature foundation. The actual experiments, validation, real results, and final writing are yours to do before submitting anywhere.
 
 ---
 
@@ -217,8 +232,15 @@ The dashboard is tab-based:
 | Tab | How it works |
 |-----|-------------|
 | **✏️ Enter Manually** | Type any topic and set it directly |
-| **🔍 Trending Topics** | Runs Trend Agent → pick from 5 live trending topics → outputs an article |
-| **🔬 Research Gap** | Optional broad area → Runs Research Gap Agent → pick a gap topic → outputs a research paper |
+| **🔍 Trending Topics** | Runs Trend Agent → pick from 5 live trending topics |
+| **🔬 Research Gap** | Optional topic filter → Runs Research Gap Agent → pick a gap to research |
+
+After selecting a topic from any tab, **both run buttons are always available**:
+
+| Button | What it does |
+|--------|-------------|
+| **🚀 Run Full Pipeline → Article** | Researcher → Analyst → Synthesizer → Publisher (blog article) |
+| **🔬 Run Research Pipeline → Paper** | Researcher → Analyst → Synthesizer → Paper Writer (research draft) |
 
 ### Option B — Command Line
 
@@ -315,9 +337,10 @@ Output quality depends on the model configured for `PAPER_WRITER`:
 ### Research Gap Agent *(Topic discovery — Research mode)*
 
 - Fetches recent papers from **5 research categories** in parallel (cs.AI, cs.LG, cs.CL, cs.CV, stat.ML)
-- Accepts an optional broad area to narrow the search (e.g. "computer vision")
-- Uses LLM to identify **5 genuine research gaps** with title + gap description
-- Selecting a gap automatically enables Research Paper mode in the UI
+- **Topic-aware search** — uses your pipeline topic (or an explicit filter) to search paper abstracts and bodies (`all:` field), not just titles, so narrow topics still return results
+- **Randomised each run** — uses a random start offset per category, shuffles and samples a different subset of papers, and rotates through 10 analytical lenses (scalability, safety, efficiency, interpretability, etc.) so you get genuinely different gaps every time you click Run
+- Uses LLM at `temperature=0.9` to identify **5 genuine research gaps** with title + one-sentence gap description
+- Selecting a gap automatically enables Research Paper mode for the pipeline
 - Output: `research_gap_output.json`
 
 ---
