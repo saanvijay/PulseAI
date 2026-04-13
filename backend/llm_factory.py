@@ -24,7 +24,7 @@ OLLAMA_BASE_URL  = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 OLLAMA_MODEL     = os.getenv("OLLAMA_MODEL", "llama3.2")
 
 
-def get_llm(agent_key: str = "") -> LLM:
+def get_llm(agent_key: str = "", temperature: float | None = None) -> LLM:
     """
     Return a configured CrewAI LLM for the given agent.
 
@@ -38,17 +38,21 @@ def get_llm(agent_key: str = "") -> LLM:
     provider = os.getenv(f"{key}_PROVIDER", "") or os.getenv("LLM_PROVIDER", "")
     provider = provider.lower()
 
+    kwargs = {} if temperature is None else {"temperature": temperature}
+
     # Cloud provider requested
     if model and provider and provider != "ollama":
         if provider == "anthropic":
             llm = LLM(
                 model=f"anthropic/{model}",
                 api_key=os.getenv("ANTHROPIC_API_KEY", ""),
+                **kwargs,
             )
         elif provider == "openai":
             llm = LLM(
                 model=f"openai/{model}",
                 api_key=os.getenv("OPENAI_API_KEY", ""),
+                **kwargs,
             )
         else:
             raise ValueError(
@@ -61,11 +65,11 @@ def get_llm(agent_key: str = "") -> LLM:
     # Ollama override (different model but still local)
     if model and (not provider or provider == "ollama"):
         _log(agent_key, "ollama", model)
-        return LLM(model=f"ollama/{model}", base_url=OLLAMA_BASE_URL)
+        return LLM(model=f"ollama/{model}", base_url=OLLAMA_BASE_URL, **kwargs)
 
     # Default — local Ollama with OLLAMA_MODEL
     _log(agent_key, "ollama", OLLAMA_MODEL)
-    return LLM(model=f"ollama/{OLLAMA_MODEL}", base_url=OLLAMA_BASE_URL)
+    return LLM(model=f"ollama/{OLLAMA_MODEL}", base_url=OLLAMA_BASE_URL, **kwargs)
 
 
 def is_cloud_provider(agent_key: str = "") -> bool:

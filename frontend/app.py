@@ -65,7 +65,7 @@ def _agent_thread(agent_name, script_path, extra_args=()):
     proc  = subprocess.Popen(
         cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
         text=True, bufsize=1, cwd=BACKEND_DIR,
-        env={**os.environ, "PYTHONUNBUFFERED": "1"},
+        env={**os.environ, "PYTHONUNBUFFERED": "1", "PYTHONPATH": BACKEND_DIR},
     )
     state["process"] = proc
     for raw in iter(proc.stdout.readline, ""):
@@ -216,17 +216,32 @@ with tab_main:
 
     with ttab_gap:
         st.caption("Scan recent research papers and identify unexplored gaps. Output will be a structured research paper.")
-        gap_broad = st.text_input(
-            "Broad area (optional)",
-            placeholder="e.g. computer vision, NLP, reinforcement learning…",
-            disabled=busy,
-            key="gap_broad_input",
-            label_visibility="collapsed",
-        )
+        st.markdown("**Search topic** *(defaults to the topic you set above if left blank)*")
+        gap_col1, gap_col2 = st.columns([4, 1])
+        with gap_col1:
+            gap_broad = st.text_input(
+                "Research area",
+                placeholder="e.g. computer vision, NLP, reinforcement learning…",
+                disabled=busy,
+                key="gap_broad_input",
+                label_visibility="collapsed",
+            )
+        with gap_col2:
+            if st.button("✖ Clear", use_container_width=True, disabled=busy, key="clear_gap_broad"):
+                st.session_state["gap_broad_input"] = ""
+                st.rerun()
+
+        # Resolve the actual search term: explicit input > pipeline topic > nothing (all AI/ML)
+        search_term = gap_broad.strip() or topic
+        if search_term:
+            st.info(f"🔍 Will search papers about: **{search_term}**")
+        else:
+            st.info("🌐 Will search all recent AI/ML papers (no topic set)")
+
         if st.button("🔬 Run Research Gap Agent", use_container_width=True, disabled=busy):
             st.session_state.trend_topics = []
             st.session_state.research_gap_items = []
-            args = (gap_broad.strip(),) if gap_broad.strip() else ()
+            args = (search_term,) if search_term else ()
             launch_agent("Research Gap Agent", os.path.join(BACKEND_DIR, "agents/research_gap_agent.py"), args)
             st.rerun()
         if st.session_state.research_gap_items:
@@ -252,16 +267,19 @@ with tab_main:
 
     st.divider()
 
-    # ── Run buttons ───────────────────────────────────────────────────────────
-    if research_mode:
-        if st.button("🔬 Run Research Pipeline  (→ Research Paper)", use_container_width=True, type="primary", disabled=busy):
-            args = (topic, "--research") if topic else ("--research",)
-            launch_agent("Research Pipeline", os.path.join(BACKEND_DIR, "orchestrator.py"), args)
-            st.rerun()
-    else:
+    # ── Run buttons — always show both options ─────────────────────────────────
+    col_art, col_res = st.columns(2)
+    with col_art:
         if st.button("🚀 Run Full Pipeline  (→ Article)", use_container_width=True, type="primary", disabled=busy):
+            st.session_state.research_mode = False
             args = (topic,) if topic else ()
             launch_agent("Full Pipeline", os.path.join(BACKEND_DIR, "orchestrator.py"), args)
+            st.rerun()
+    with col_res:
+        if st.button("🔬 Run Research Pipeline  (→ Paper)", use_container_width=True, type="secondary", disabled=busy):
+            st.session_state.research_mode = True
+            args = (topic, "--research") if topic else ("--research",)
+            launch_agent("Research Pipeline", os.path.join(BACKEND_DIR, "orchestrator.py"), args)
             st.rerun()
 
     st.divider()

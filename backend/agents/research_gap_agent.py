@@ -4,6 +4,7 @@
 
 import json
 import os
+import random
 import re
 import sys
 import urllib.parse
@@ -38,13 +39,17 @@ def fetch_arxiv(category: str, broad_topic: str = "", max_results: int = PAPERS_
     """Fetch recent papers from one research paper category. Returns (category, papers)."""
     try:
         if broad_topic:
-            query = f"cat:{category} AND ti:{urllib.parse.quote(broad_topic)}"
+            # Wrap in quotes for phrase search; let urlencode handle encoding
+            query = f'cat:{category} AND all:"{broad_topic}"'
         else:
             query = f"cat:{category}"
+        # Random start offset — keep small so it stays within typical result counts
+        start = random.randint(0, 15)
         params = {
             "search_query": query,
             "sortBy":       "submittedDate",
             "sortOrder":    "descending",
+            "start":        start,
             "max_results":  max_results,
         }
         url  = f"{ARXIV_API}?{urllib.parse.urlencode(params)}"
@@ -69,12 +74,17 @@ def fetch_arxiv(category: str, broad_topic: str = "", max_results: int = PAPERS_
 # ── Gap analysis via CrewAI + Ollama ──────────────────────────────────────────
 
 def find_gaps(papers: list[dict], broad_topic: str = "") -> list[dict]:
+    # Shuffle so each run sees a different ordering / subset of papers
+    shuffled = papers.copy()
+    random.shuffle(shuffled)
+    subset = random.sample(shuffled, min(20, len(shuffled))) if len(shuffled) > 20 else shuffled
+
     papers_text = "\n\n".join(
         f"Title: {p['title']}\nAbstract: {p['abstract']}"
-        for p in papers[:20]
+        for p in subset
     )
 
-    llm = get_llm("RESEARCH_GAP")
+    llm = get_llm("RESEARCH_GAP", temperature=0.9)
 
     analyst = Agent(
         role="AI Research Gap Analyst",
@@ -87,12 +97,30 @@ def find_gaps(papers: list[dict], broad_topic: str = "") -> list[dict]:
         verbose=False,
     )
 
-    topic_line = f"Broad area of interest: {broad_topic}\n\n" if broad_topic else ""
+    topic_line = f"Topic to focus on: {broad_topic}\n\n" if broad_topic else ""
+    seed = random.randint(1000, 9999)
+
+    # Rotate the analytical lens each run so results are genuinely different
+    _ANGLES = [
+        "Focus on practical deployment and real-world scalability challenges.",
+        "Focus on theoretical limitations and mathematical open problems.",
+        "Focus on efficiency, speed, and resource/compute constraints.",
+        "Focus on robustness, safety, alignment, and failure modes.",
+        "Focus on multi-modal, cross-domain, or cross-lingual applications.",
+        "Focus on data quality, dataset bias, and annotation limitations.",
+        "Focus on evaluation metrics and benchmarking gaps.",
+        "Focus on interpretability, explainability, and trustworthiness.",
+        "Focus on low-resource, few-shot, or zero-shot scenarios.",
+        "Focus on continual learning, catastrophic forgetting, and adaptation.",
+    ]
+    angle = random.choice(_ANGLES)
 
     task = Task(
-        description=f"""IMPORTANT: Respond in English only.
+        description=f"""IMPORTANT: Respond in English only. [run-id:{seed}]
 
-{topic_line}Below are recent research papers in AI/ML. Analyse them and identify 5 genuine research gaps — areas that are underexplored, missing, or where open questions remain unanswered.
+{topic_line}Analytical lens for this run: {angle}
+
+Below are recent research papers. Identify 5 genuine research gaps through the lens above — areas that are underexplored, missing, or where open questions remain unanswered.
 
 RECENT PAPERS:
 {papers_text}
