@@ -14,8 +14,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
-from crewai import Agent, Crew, LLM, Task
+from crewai import Agent, Crew, Task
 from dotenv import load_dotenv
+from llm_factory import get_llm
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 BASE_DIR = Path(__file__).parent.parent
@@ -24,8 +25,6 @@ load_dotenv(BASE_DIR.parent / ".env")
 OUTPUT_FILE = BASE_DIR / "output" / "trend_output.json"
 
 # ── Config ────────────────────────────────────────────────────────────────────
-OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-OLLAMA_MODEL    = os.getenv("OLLAMA_MODEL", "llama3.2")
 
 CONFIG_DIR = BASE_DIR.parent / "config"
 SOURCES    = json.loads((CONFIG_DIR / "sources.json").read_text())
@@ -114,7 +113,7 @@ def get_trending_topic() -> dict:
     print("  Identifying top 5 trending topics with Ollama...")
 
     # Step 3: Use CrewAI + Ollama to identify the top 5 trending topics
-    llm = LLM(model=f"ollama/{OLLAMA_MODEL}", base_url=OLLAMA_BASE_URL)
+    llm = get_llm("TREND")
 
     analyst = Agent(
         role="AI Trend Analyst",

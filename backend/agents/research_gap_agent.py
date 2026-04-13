@@ -13,8 +13,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
-from crewai import Agent, Crew, LLM, Task
+from crewai import Agent, Crew, Task
 from dotenv import load_dotenv
+from llm_factory import get_llm
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 BASE_DIR = Path(__file__).parent.parent
@@ -23,8 +24,6 @@ load_dotenv(BASE_DIR.parent / ".env")
 OUTPUT_FILE = BASE_DIR / "output" / "research_gap_output.json"
 
 # ── Config ────────────────────────────────────────────────────────────────────
-OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-OLLAMA_MODEL    = os.getenv("OLLAMA_MODEL", "llama3.2")
 
 # ArXiv categories to scan
 ARXIV_API        = "http://export.arxiv.org/api/query"
@@ -75,7 +74,7 @@ def find_gaps(papers: list[dict], broad_topic: str = "") -> list[dict]:
         for p in papers[:20]
     )
 
-    llm = LLM(model=f"ollama/{OLLAMA_MODEL}", base_url=OLLAMA_BASE_URL)
+    llm = get_llm("RESEARCH_GAP")
 
     analyst = Agent(
         role="AI Research Gap Analyst",

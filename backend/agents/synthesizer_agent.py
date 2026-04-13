@@ -13,8 +13,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
-from crewai import Agent, Crew, LLM, Task
+from crewai import Agent, Crew, Task
 from dotenv import load_dotenv
+from llm_factory import get_llm
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 BASE_DIR = Path(__file__).parent.parent
@@ -25,7 +26,6 @@ OUTPUT_FILE = BASE_DIR / "output" / "synthesizer_output.json"
 
 # ── Config ────────────────────────────────────────────────────────────────────
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-PRIMARY_MODEL   = os.getenv("OLLAMA_MODEL", "llama3.2")
 
 TOKENS = json.loads((BASE_DIR.parent / "config" / "tokens.json").read_text())
 
@@ -107,7 +107,7 @@ def create_final_summary(report: str, model_responses: list[dict], topic: str = 
         f"[{r['model']}]:\n{r['summary']}" for r in successful
     )
 
-    llm = LLM(model=f"ollama/{PRIMARY_MODEL}", base_url=OLLAMA_BASE_URL)
+    llm = get_llm("SYNTHESIZER")
 
     consolidator = Agent(
         role="AI Insights Synthesizer",

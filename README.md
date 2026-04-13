@@ -173,6 +173,11 @@ Create your `.env` file in the project root (`PulseAI/.env`):
 # ── Ollama (local — no API key needed) ────────────────────────────
 OLLAMA_MODEL=llama3.2
 OLLAMA_BASE_URL=http://localhost:11434
+
+# ── Cloud models (optional — see Cloud Models section below) ──────
+# LLM_PROVIDER=anthropic
+# LLM_MODEL=claude-opus-4-6
+# ANTHROPIC_API_KEY=sk-ant-...
 ```
 
 ---
@@ -389,14 +394,75 @@ The output is always plain text — copy it to any platform:
 
 ---
 
+## Cloud Models (Optional)
+
+By default every agent runs on local Ollama models — no API keys, no cost. If you want higher quality output (especially for the Research Paper mode), you can optionally switch any agent to a cloud model.
+
+### How it works
+
+A central `llm_factory.py` resolves which model each agent uses, in this priority order:
+
+| Priority | Env var | Example |
+|----------|---------|---------|
+| 1 (highest) | `{AGENT}_MODEL` + `{AGENT}_PROVIDER` | Per-agent override |
+| 2 | `LLM_MODEL` + `LLM_PROVIDER` | All agents at once |
+| 3 (default) | `OLLAMA_MODEL` + `OLLAMA_BASE_URL` | Local Ollama |
+
+Agent keys: `ANALYST`, `SYNTHESIZER`, `PAPER_WRITER`, `TREND`, `RESEARCH_GAP`
+
+### Option A — Upgrade all agents to a cloud model
+
+```env
+LLM_PROVIDER=anthropic
+LLM_MODEL=claude-opus-4-6
+ANTHROPIC_API_KEY=sk-ant-...
+```
+
+```env
+LLM_PROVIDER=openai
+LLM_MODEL=gpt-4o
+OPENAI_API_KEY=sk-...
+```
+
+### Option B — Upgrade only the Paper Writer (recommended)
+
+Keep everything local but use a cloud model just for writing the research paper draft, where output quality matters most:
+
+```env
+# All other agents stay on local Ollama
+OLLAMA_MODEL=llama3.2
+
+# Only the Paper Writer uses Claude
+PAPER_WRITER_PROVIDER=anthropic
+PAPER_WRITER_MODEL=claude-opus-4-6
+ANTHROPIC_API_KEY=sk-ant-...
+```
+
+### Supported providers
+
+| Provider | `_PROVIDER` value | Models |
+|----------|------------------|--------|
+| Ollama (local) | `ollama` | Any model pulled locally |
+| Anthropic | `anthropic` | `claude-opus-4-6`, `claude-sonnet-4-6`, etc. |
+| OpenAI | `openai` | `gpt-4o`, `gpt-4o-mini`, etc. |
+
+> **Paper length by model type:**
+> - **Local model** → compact draft (~2-3 pages, 6 sections). Local 7B models struggle with long coherent outputs.
+> - **Cloud model** → full academic paper (~12-15 pages, 9 sections + references, ~6000-8000 words): Abstract, Keywords, Introduction, Background & Preliminaries, Related Work, Problem Formulation, Methodology, Experimental Setup, Expected Results, Discussion, Conclusion, References.
+>
+> Even with cloud models the output is a **draft** — real research, experiments, and validation are still yours to do before submitting anywhere.
+
+---
+
 ## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
 | Agent framework | Python + CrewAI |
-| Local LLMs | Ollama (llama3.2, mistral, qwen2.5, phi3, gemma2) |
+| Local LLMs (default) | Ollama (llama3.2, mistral, qwen2.5, phi3, gemma2) |
+| Cloud LLMs (optional) | Anthropic (Claude), OpenAI (GPT-4o) via `llm_factory.py` |
 | Web search | Google News RSS (no API key required) |
 | Article scraping | BeautifulSoup4 |
 | Research paper source | Academic paper APIs (cs.AI, cs.LG, cs.CL, cs.CV, stat.ML categories) |
 | Dashboard | Streamlit (managed with uv) |
-| Output | Plain-text article or research paper |
+| Output | Plain-text article or research paper draft |

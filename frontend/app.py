@@ -381,10 +381,15 @@ with tab_publisher:
     data = load_json("publisher_output.json")
 
     is_research = data.get("mode") == "research" if data else False
+    is_cloud    = data.get("cloud", False) if data else False
 
     if is_research:
         st.markdown("### 🔬 Publisher Agent — Research Paper")
-        st.markdown("> This paper was generated in **Research Mode**. Copy it to any research paper platform, Overleaf, or your institution's repository.")
+        if is_cloud:
+            st.success("☁️ Generated with a cloud model — full 12-15 page academic paper.")
+        else:
+            st.warning("💻 Generated with a local model — compact draft. Use a cloud model for a full paper.")
+        st.markdown("> This is a draft to help you get started. Do your own research, run experiments, and write the final paper before submitting anywhere.")
         if data.get("gap"):
             st.info(f"📌 Research Gap Addressed: {data['gap']}")
     else:
