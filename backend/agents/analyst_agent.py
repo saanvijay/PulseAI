@@ -32,7 +32,7 @@ def organize_content() -> dict:
     articles = raw_data["articles"]
 
     articles_text = "\n\n---\n\n".join(
-        f"Title: {a['title']}\nSnippet: {a['snippet']}\nLink: {a['link']}"
+        f"Title: {a['title']}\nContent: {a.get('full_content') or a['snippet']}\nLink: {a['link']}"
         for a in articles
     )
 

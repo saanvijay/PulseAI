@@ -7,6 +7,8 @@
 
 import json
 import os
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -36,9 +38,23 @@ OLLAMA_MODELS = [
     {"name": "Gemma 2",    "model": "gemma2"},
 ]
 
+# ── Retry helper ──────────────────────────────────────────────────────────────
+
+def _retry(fn, *args, retries: int = 3, backoff: int = 2, **kwargs):
+    """Call fn(*args, **kwargs) up to `retries` times with exponential backoff."""
+    for attempt in range(retries):
+        try:
+            return fn(*args, **kwargs)
+        except Exception as e:
+            if attempt == retries - 1:
+                raise
+            wait = backoff ** attempt
+            print(f"  Retry {attempt + 1}/{retries - 1} after {wait}s ({e})", flush=True)
+            time.sleep(wait)
+
 # ── Ollama direct API call ─────────────────────────────────────────────────────
 
-def ask_ollama(model: str, prompt: str, max_tokens: int = 1024) -> str:
+def _ollama_post(model: str, prompt: str, max_tokens: int) -> str:
     response = requests.post(
         f"{OLLAMA_BASE_URL}/api/generate",
         json={
@@ -52,11 +68,15 @@ def ask_ollama(model: str, prompt: str, max_tokens: int = 1024) -> str:
     response.raise_for_status()
     return response.json()["response"]
 
+
+def ask_ollama(model: str, prompt: str, max_tokens: int = 1024) -> str:
+    return _retry(_ollama_post, model, prompt, max_tokens)
+
 # ── Per-model call with error handling ────────────────────────────────────────
 
 def call_model(name: str, model: str, report: str, topic: str = "") -> dict:
     try:
-        print(f"  Asking {name}...")
+        print(f"  Asking {name}...", flush=True)
         topic_line = f'The research topic is: "{topic}"\n\n' if topic else ""
         prompt = (
             "IMPORTANT: Respond in English only. Do not use any other language.\n\n"
@@ -73,9 +93,10 @@ def call_model(name: str, model: str, report: str, topic: str = "") -> dict:
             f"REPORT:\n{report}"
         )
         summary = ask_ollama(model, prompt, TOKENS["synthesizer_per_model"])
+        print(f"  {name} done.", flush=True)
         return {"model": name, "status": "success", "summary": summary}
     except Exception as e:
-        print(f"  {name} failed: {e}")
+        print(f"  {name} failed: {e}", flush=True)
         return {"model": name, "status": "error", "error": str(e), "summary": None}
 
 # ── Consolidation via CrewAI + Ollama ─────────────────────────────────────────
@@ -99,7 +120,7 @@ def create_final_summary(report: str, model_responses: list[dict], topic: str = 
         verbose=False,
     )
 
-    topic_line = f'Research topic: "{topic}"\n\n' if topic else ""
+    topic_line  = f'Research topic: "{topic}"\n\n' if topic else ""
     topic_focus = f" Everything must stay focused on the research topic: **{topic}**." if topic else ""
 
     task = Task(
@@ -153,7 +174,7 @@ Return only the structured summary with no meta-commentary.""",
 # ── Main agent function ────────────────────────────────────────────────────────
 
 def summarize_with_multiple_models() -> dict:
-    print("Agent 3: Getting summaries from multiple Ollama models...")
+    print("Agent 3: Querying multiple Ollama models in parallel...")
 
     input_data = json.loads(INPUT_FILE.read_text())
     report     = input_data["report"]
@@ -162,11 +183,19 @@ def summarize_with_multiple_models() -> dict:
     if topic:
         print(f"  Topic: \"{topic}\"")
 
-    # Call each model sequentially (Ollama is local — parallel adds no benefit)
-    model_responses = [
-        call_model(m["name"], m["model"], report, topic)
-        for m in OLLAMA_MODELS
-    ]
+    # Query all models in parallel
+    model_responses_map: dict[str, dict] = {}
+    with ThreadPoolExecutor(max_workers=len(OLLAMA_MODELS)) as executor:
+        futures = {
+            executor.submit(call_model, m["name"], m["model"], report, topic): m["name"]
+            for m in OLLAMA_MODELS
+        }
+        for future in as_completed(futures):
+            result = future.result()
+            model_responses_map[result["model"]] = result
+
+    # Restore original model order
+    model_responses = [model_responses_map[m["name"]] for m in OLLAMA_MODELS]
 
     success_count = sum(1 for r in model_responses if r["status"] == "success")
     print(f"  {success_count}/{len(OLLAMA_MODELS)} models responded successfully.")
@@ -175,11 +204,11 @@ def summarize_with_multiple_models() -> dict:
     final_summary = create_final_summary(report, model_responses, topic)
 
     output = {
-        "timestamp":        datetime.now(timezone.utc).isoformat(),
-        "models_queried":   len(OLLAMA_MODELS),
+        "timestamp":         datetime.now(timezone.utc).isoformat(),
+        "models_queried":    len(OLLAMA_MODELS),
         "models_successful": success_count,
-        "model_responses":  model_responses,
-        "final_summary":    final_summary,
+        "model_responses":   model_responses,
+        "final_summary":     final_summary,
     }
 
     OUTPUT_FILE.write_text(json.dumps(output, indent=2))

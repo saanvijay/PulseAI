@@ -253,7 +253,27 @@ with tab_publisher:
         st.caption(f"Last run: {data.get('timestamp','?')}")
         st.markdown("> Copy and paste this article to LinkedIn, Medium, Substack, or any blog platform.")
         article = data.get("final_article", "")
-        st.text_area("Article", value=article, height=500, disabled=True)
+
+        if article:
+            dl_col1, dl_col2 = st.columns(2)
+            with dl_col1:
+                st.download_button(
+                    "📥 Download as Markdown",
+                    data=article,
+                    file_name="pulseai_article.md",
+                    mime="text/markdown",
+                    use_container_width=True,
+                )
+            with dl_col2:
+                st.download_button(
+                    "📄 Download as Text",
+                    data=article,
+                    file_name="pulseai_article.txt",
+                    mime="text/plain",
+                    use_container_width=True,
+                )
+
+        st.text_area("Article", value=article, height=450, disabled=True)
 
 
 # ══════════════════════════════════════════════════════════════════════════════

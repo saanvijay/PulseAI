@@ -1,11 +1,12 @@
-# Agent 1: Fetch detailed AI news about the selected topic using Google News RSS.
-# Searches the same sources the Trend Agent used, in parallel batches of 3.
+# Agent 1: Fetch detailed AI news about the selected topic using Google News RSS,
+# then scrape full article content for the top results.
 # No LLM involved — raw articles are collected directly and saved as-is.
 
 import json
 import os
 import random
 import sys
+import time
 import urllib.parse
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -14,6 +15,12 @@ from pathlib import Path
 
 import requests
 from dotenv import load_dotenv
+
+try:
+    from bs4 import BeautifulSoup
+    _BS4_AVAILABLE = True
+except ImportError:
+    _BS4_AVAILABLE = False
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 BASE_DIR = Path(__file__).parent.parent
@@ -60,6 +67,25 @@ ARTICLES_PER_SOURCE = 3
 # Minimum articles per batch before triggering a fallback batch
 MIN_ARTICLES_PER_BATCH = 3
 
+# How many articles to scrape for full content
+SCRAPE_TOP_N    = 10
+SCRAPE_MAX_CHARS = 3000
+
+_HEADERS = {"User-Agent": "Mozilla/5.0"}
+
+# ── Retry helper ──────────────────────────────────────────────────────────────
+
+def _retry(fn, *args, retries: int = 3, backoff: int = 2, **kwargs):
+    """Call fn(*args, **kwargs) up to `retries` times with exponential backoff."""
+    for attempt in range(retries):
+        try:
+            return fn(*args, **kwargs)
+        except Exception as e:
+            if attempt == retries - 1:
+                raise
+            wait = backoff ** attempt
+            time.sleep(wait)
+
 # ── Source selection ──────────────────────────────────────────────────────────
 
 def get_primary_and_fallback() -> tuple[list[dict], list[dict]]:
@@ -80,10 +106,10 @@ def get_primary_and_fallback() -> tuple[list[dict], list[dict]]:
             print(f"  Could not read trend_output.json ({e}).", flush=True)
 
     # Build primary: trend sources first, then all remaining researcher sources
-    trend_set = set(trend_labels)
-    trend_sources  = [ALL_SOURCES_BY_LABEL[l] for l in trend_labels if l in ALL_SOURCES_BY_LABEL]
-    other_sources  = [s for s in RESEARCHER_PRIMARY_SOURCES if s["label"] not in trend_set]
-    primary        = trend_sources + other_sources
+    trend_set     = set(trend_labels)
+    trend_sources = [ALL_SOURCES_BY_LABEL[l] for l in trend_labels if l in ALL_SOURCES_BY_LABEL]
+    other_sources = [s for s in RESEARCHER_PRIMARY_SOURCES if s["label"] not in trend_set]
+    primary       = trend_sources + other_sources
 
     print(f"  Primary sources ({len(primary)}): {', '.join(s['label'] for s in primary)}", flush=True)
     return primary, RESEARCHER_FALLBACK_SOURCES
@@ -91,39 +117,83 @@ def get_primary_and_fallback() -> tuple[list[dict], list[dict]]:
 # ── Google News RSS ───────────────────────────────────────────────────────────
 
 _GNEWS_RSS = "https://news.google.com/rss/search"
-_HEADERS   = {"User-Agent": "Mozilla/5.0"}
+
+def _gnews_fetch(source: dict, topic: str, max_results: int) -> tuple[dict, list[dict]]:
+    query = f"{topic} {source['label']}" if topic else source["query"]
+    url   = f"{_GNEWS_RSS}?q={urllib.parse.quote(query)}&hl=en-US&gl=US&ceid=US:en"
+    resp  = requests.get(url, headers=_HEADERS, timeout=15)
+    resp.raise_for_status()
+    root  = ET.fromstring(resp.content)
+    items = root.findall(".//item")[:max_results]
+    articles = []
+    for item in items:
+        desc = item.findtext("description", "")
+        if desc.startswith("<"):
+            try:
+                desc = ET.fromstring(f"<d>{desc}</d>").text or ""
+            except Exception:
+                desc = ""
+        articles.append({
+            "title":    item.findtext("title", ""),
+            "snippet":  desc.strip(),
+            "link":     item.findtext("link", ""),
+            "source":   source["label"],
+            "category": source["category"],
+            "date":     item.findtext("pubDate", ""),
+        })
+    return source, articles
+
 
 def gnews_search(source: dict, topic: str, max_results: int = ARTICLES_PER_SOURCE) -> tuple[dict, list[dict]]:
-    """Fetch articles for one source. Returns (source, articles)."""
-    # When a topic is set, search "{topic} {source label}" — keeps the query
-    # tight and topic-focused rather than mixing in the generic source query string.
-    query = f"{topic} {source['label']}" if topic else source["query"]
+    """Fetch articles for one source with retry. Returns (source, articles)."""
     try:
-        url  = f"{_GNEWS_RSS}?q={urllib.parse.quote(query)}&hl=en-US&gl=US&ceid=US:en"
-        resp = requests.get(url, headers=_HEADERS, timeout=15)
-        resp.raise_for_status()
-        root  = ET.fromstring(resp.content)
-        items = root.findall(".//item")[:max_results]
-        articles = []
-        for item in items:
-            desc = item.findtext("description", "")
-            if desc.startswith("<"):
-                try:
-                    desc = ET.fromstring(f"<d>{desc}</d>").text or ""
-                except Exception:
-                    desc = ""
-            articles.append({
-                "title":    item.findtext("title", ""),
-                "snippet":  desc.strip(),
-                "link":     item.findtext("link", ""),
-                "source":   source["label"],
-                "category": source["category"],
-                "date":     item.findtext("pubDate", ""),
-            })
-        return source, articles
+        return _retry(_gnews_fetch, source, topic, max_results)
     except Exception as e:
         print(f"  [ERROR]     {source['label']}: {e}", flush=True)
         return source, []
+
+# ── Full article scraper ──────────────────────────────────────────────────────
+
+def scrape_full_content(url: str) -> str | None:
+    """Fetch and extract the main text content of an article URL."""
+    if not _BS4_AVAILABLE:
+        return None
+    try:
+        resp = requests.get(url, headers=_HEADERS, timeout=10)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "html.parser")
+        # Remove noise tags
+        for tag in soup(["script", "style", "nav", "footer", "header", "aside", "form"]):
+            tag.decompose()
+        # Prefer semantic content containers
+        main = soup.find("article") or soup.find("main") or soup.find("body")
+        text = main.get_text(separator=" ", strip=True) if main else ""
+        text = " ".join(text.split())  # collapse whitespace
+        return text[:SCRAPE_MAX_CHARS] if text else None
+    except Exception:
+        return None
+
+
+def scrape_articles_parallel(articles: list[dict]) -> None:
+    """Scrape full content for the top N articles in parallel (mutates in place)."""
+    if not _BS4_AVAILABLE:
+        print("  [SCRAPER] beautifulsoup4 not installed — skipping full content scraping.", flush=True)
+        print("            Run: cd frontend && uv sync", flush=True)
+        return
+
+    to_scrape = [a for a in articles if a.get("link")][:SCRAPE_TOP_N]
+    print(f"\n  Scraping full content for top {len(to_scrape)} articles...", flush=True)
+
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        futures = {executor.submit(scrape_full_content, a["link"]): a for a in to_scrape}
+        for future in as_completed(futures):
+            article = futures[future]
+            content = future.result()
+            if content:
+                article["full_content"] = content
+                print(f"  [SCRAPED] {article['title'][:70]}", flush=True)
+            else:
+                print(f"  [SKIP]    {article['title'][:70]}", flush=True)
 
 # ── Parallel batch search ─────────────────────────────────────────────────────
 
@@ -179,10 +249,10 @@ def fetch_latest_ai_concepts(topic: str = "") -> dict:
 
         # Too thin — pull a fallback batch immediately
         if len(batch_articles) < MIN_ARTICLES_PER_BATCH and remaining_fallbacks:
-            fallback_batch  = remaining_fallbacks[:3]
+            fallback_batch      = remaining_fallbacks[:3]
             remaining_fallbacks = remaining_fallbacks[3:]
-            fb_names        = [s["label"] for s in fallback_batch]
-            batch_num      += 1
+            fb_names            = [s["label"] for s in fallback_batch]
+            batch_num          += 1
             print(f"\n  Only {len(batch_articles)} articles — fallback batch {batch_num}: {', '.join(fb_names)}", flush=True)
             fb_articles = search_batch_parallel(fallback_batch, topic)
             raw_articles.extend(fb_articles)
@@ -202,7 +272,7 @@ def fetch_latest_ai_concepts(topic: str = "") -> dict:
         print(f"  Batch {batch_num}: {len(fb_articles)} articles | Total so far: {len(raw_articles)}", flush=True)
 
     # Deduplicate by link
-    seen  = set()
+    seen            = set()
     unique_articles = []
     for a in raw_articles:
         if a["link"] not in seen:
@@ -210,6 +280,12 @@ def fetch_latest_ai_concepts(topic: str = "") -> dict:
             unique_articles.append(a)
 
     print(f"\n  {len(unique_articles)} unique articles collected from {len(sources_used)} sources.", flush=True)
+
+    # Scrape full content for top articles
+    scrape_articles_parallel(unique_articles)
+
+    scraped_count = sum(1 for a in unique_articles if a.get("full_content"))
+    print(f"  {scraped_count} articles enriched with full content.", flush=True)
 
     output = {
         "timestamp":        datetime.now(timezone.utc).isoformat(),
@@ -221,7 +297,7 @@ def fetch_latest_ai_concepts(topic: str = "") -> dict:
 
     OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT_FILE.write_text(json.dumps(output, indent=2))
-    print(f"Agent 1: Done! {len(unique_articles)} articles saved.", flush=True)
+    print(f"Agent 1: Done! {len(unique_articles)} articles saved ({scraped_count} with full content).", flush=True)
     return output
 
 
