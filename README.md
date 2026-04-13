@@ -1,41 +1,85 @@
 # 🤖 PulseAI — Latest AI Updates Pipeline
 
-A multi-agent system that automatically fetches, organizes, summarizes, and displays a ready-to-publish article on the latest AI developments — running entirely on **local models** via **CrewAI + Ollama**. No cloud AI API keys required.
+A multi-agent system that automatically fetches, organizes, summarizes, and displays a ready-to-publish **article** or a **research paper draft** on the latest AI developments — running entirely on **local models** via **CrewAI + Ollama**. No cloud AI API keys required.
+
+---
+
+## Two Modes
+
+| Mode | Topic source | Output |
+|------|-------------|--------|
+| **Article** | Trending topics or manual input | Blog post / LinkedIn article — ready to publish |
+| **Research Paper** | Research Gap Agent (unexplored areas in recent papers) | A draft outline and idea — a starting point for your own real research |
+
+> **Important:** The Research Paper mode does **not** produce a publication-ready paper. It identifies a potential research gap and generates a structured draft to help you get started. The actual research, experiments, validation, and writing are yours to do before submitting anywhere.
 
 ---
 
 ## How It Works
 
+### Article Pipeline
+
 ```
-Web Sources (Google News RSS)
+Topic (manual / Trend Agent)
          │
          ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │  Agent 1: Researcher                                            │
-│  Searches the web via Google News RSS across configured sources │
-│  → Ollama organizes results into structured articles JSON       │
+│  Fetches articles via Google News RSS across configured sources │
+│  Scrapes full content for top 10 articles (BeautifulSoup)       │
+│  Retries failed fetches with exponential backoff                │
 └───────────────────────────┬─────────────────────────────────────┘
                             │ researcher_output.json
                             ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │  Agent 2: Analyst                                               │
-│  CrewAI + Ollama reads the articles                             │
-│  → Produces a structured 8-section technical report            │
+│  CrewAI + Ollama reads full article content                     │
+│  → Produces a structured technical report (content-driven       │
+│    headings, not a fixed template)                              │
 └───────────────────────────┬─────────────────────────────────────┘
                             │ analyst_output.json
                             ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │  Agent 3: Synthesizer                                           │
-│  Sends the report to 5 local Ollama models:                     │
+│  Queries 5 local Ollama models IN PARALLEL:                     │
 │    Llama 3.2  ·  Mistral  ·  Qwen 2.5  ·  Phi-3  ·  Gemma 2   │
-│  → Ollama consolidates all responses into one final summary     │
+│  → Consolidates all responses into one final summary            │
 └───────────────────────────┬─────────────────────────────────────┘
                             │ synthesizer_output.json
                             ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │  Agent 4: Publisher                                             │
 │  → Displays the final article                                   │
-│  → Ready to publish on LinkedIn, Medium, or any blog           │
+│  → Download as Markdown or plain text                           │
+│  → Ready to publish on LinkedIn, Medium, or any blog            │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Research Paper Pipeline
+
+```
+Research Gap Agent (optional broad area input)
+         │
+         ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Research Gap Agent                                             │
+│  Scans recent papers across 5 categories in parallel:           │
+│    cs.AI  ·  cs.LG  ·  cs.CL  ·  cs.CV  ·  stat.ML            │
+│  → Ollama identifies 5 genuine research gaps                    │
+│  User selects one gap topic                                     │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │ (topic + gap selected)
+                            ▼
+            [Same Agents 1 → 2 → 3 as above]
+                            │ synthesizer_output.json
+                            ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Agent 4: Paper Writer                                          │
+│  CrewAI + Ollama generates a draft research paper outline:      │
+│    Abstract · Introduction · Related Work · Problem Statement   │
+│    Methodology · Discussion · Conclusion · References           │
+│  → A starting point — you do the real research & experiments    │
+│  → Download as text or Markdown to continue in your own editor  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -50,11 +94,13 @@ PulseAI/
 │   └── tokens.json               # Ollama context/token limits per agent
 ├── backend/
 │   ├── agents/
-│   │   ├── researcher_agent.py   # Google News RSS + Ollama curation
-│   │   ├── analyst_agent.py      # CrewAI + Ollama 8-section report
-│   │   ├── synthesizer_agent.py  # 5 local Ollama models + consolidation
-│   │   ├── publisher_agent.py    # Displays the final article
-│   │   └── trend_agent.py        # Google News RSS + Ollama trend detection
+│   │   ├── researcher_agent.py   # Google News RSS + full-content scraping + retry logic
+│   │   ├── analyst_agent.py      # CrewAI + Ollama content-driven report
+│   │   ├── synthesizer_agent.py  # 5 local Ollama models queried in parallel + consolidation
+│   │   ├── publisher_agent.py    # Displays final article
+│   │   ├── paper_writer_agent.py # Writes structured research paper (research mode)
+│   │   ├── trend_agent.py        # Google News RSS + Ollama trend detection
+│   │   └── research_gap_agent.py # Scans recent papers + Ollama gap identification
 │   ├── output/                   # JSON outputs (created at runtime, gitignored)
 │   ├── tests/
 │   │   ├── conftest.py           # Shared pytest fixtures
@@ -64,9 +110,9 @@ PulseAI/
 │   │   ├── test_publisher_agent.py
 │   │   ├── test_trend_agent.py
 │   │   └── test_integration.py   # Full pipeline integration test
-│   └── orchestrator.py           # Runs all agents in sequence
+│   └── orchestrator.py           # Runs all agents in sequence (article or research mode)
 ├── frontend/
-│   ├── app.py                    # Streamlit dashboard
+│   ├── app.py                    # Streamlit dashboard (tab-based UI)
 │   └── pyproject.toml            # Python dependencies (uv)
 ├── .env                          # Your configuration (gitignored)
 ├── .gitignore
@@ -113,7 +159,7 @@ Install [uv](https://github.com/astral-sh/uv) if you don't have it:
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-Install all dependencies (Streamlit + CrewAI + tools):
+Install all dependencies (Streamlit + CrewAI + BeautifulSoup + tools):
 
 ```bash
 cd frontend && uv sync
@@ -122,12 +168,6 @@ cd frontend && uv sync
 ### 3. Configure environment variables
 
 Create your `.env` file in the project root (`PulseAI/.env`):
-
-```bash
-touch PulseAI/.env
-```
-
-Open `.env` and add the following:
 
 ```env
 # ── Ollama (local — no API key needed) ────────────────────────────
@@ -147,21 +187,36 @@ uv sync          # install dependencies first (only needed once)
 uv run streamlit run app.py
 ```
 
-The dashboard gives you:
-- A **Run Full Pipeline** button to execute all 4 agents in sequence
-- Individual buttons to run each agent separately
-- A **Trend Agent** button to auto-detect the most trending AI topic
-- Live log window streaming agent output in real time
-- Collapsible panels showing each agent's output
+The dashboard is tab-based:
+
+| Tab | Content |
+|-----|---------|
+| **🏠 Pipeline** | Topic selection, run buttons, status indicators |
+| **🔎 Researcher** | Fetched articles grouped by category (✦ = full content scraped) |
+| **📋 Analyst** | Structured technical report |
+| **🧠 Synthesizer** | Final consolidated summary + individual model responses |
+| **📤 Publisher** | Final article or research paper with download buttons |
+| **📡 Log** | Live streaming log with Stop button |
+
+**Topic selection** has three inner tabs in the Pipeline tab:
+
+| Tab | How it works |
+|-----|-------------|
+| **✏️ Enter Manually** | Type any topic and set it directly |
+| **🔍 Trending Topics** | Runs Trend Agent → pick from 5 live trending topics |
+| **🔬 Research Gap** | Optional broad area → Runs Research Gap Agent → pick a gap topic → pipeline outputs a research paper |
 
 ### Option B — Command Line
 
 ```bash
 cd backend
 
-# Run the full pipeline (optional topic argument)
+# Article pipeline (optional topic)
 python orchestrator.py
 python orchestrator.py "LLM reasoning and planning"
+
+# Research paper pipeline
+python orchestrator.py "topic" --research
 
 # Run individual agents
 python agents/researcher_agent.py
@@ -169,23 +224,87 @@ python agents/researcher_agent.py "multimodal models"
 python agents/analyst_agent.py
 python agents/synthesizer_agent.py
 python agents/publisher_agent.py
+python agents/paper_writer_agent.py
 
-# Auto-detect trending topic
+# Topic discovery agents
 python agents/trend_agent.py
+python agents/research_gap_agent.py
+python agents/research_gap_agent.py "computer vision"
 ```
+
+---
+
+## Agents
+
+### Agent 1 — Researcher
+
+- Fetches articles from Google News RSS across all configured sources in **parallel batches**
+- Automatically falls back to research sources if primary sources return too few results
+- **Scrapes full article content** for the top 10 results using BeautifulSoup (removes nav/footer noise, extracts up to 3000 chars of main text)
+- **Retries** failed fetches up to 3 times with exponential backoff
+- Deduplicates by URL
+- Output: `researcher_output.json`
+
+### Agent 2 — Analyst
+
+- Uses **full scraped content** when available (falls back to RSS snippet)
+- Generates **6–9 content-driven section headings** based on what themes actually emerge from the articles — no fixed template
+- Each section includes specific references to models, companies, and numbers
+- Output: `analyst_output.json`
+
+### Agent 3 — Synthesizer
+
+- Queries all 5 Ollama models **in parallel** using `ThreadPoolExecutor` (up to 5x faster than sequential)
+- Each model produces independent analysis across 5 dimensions: Key Developments, Technical Insights, Industry Impact, Risks, What to Watch
+- CrewAI consolidates all successful responses into one **600–800 word final summary**
+- Missing models are skipped gracefully
+- **Retries** each Ollama call up to 3 times with backoff
+- Output: `synthesizer_output.json`
+
+### Agent 4a — Publisher *(Article mode)*
+
+- Displays the final article to the console and saves it
+- Download as **Markdown** or **plain text**
+- Ready to copy to LinkedIn, Medium, Substack, or any blog
+- Output: `publisher_output.json`
+
+### Agent 4b — Paper Writer *(Research mode)*
+
+- Takes the synthesizer summary + selected research gap
+- Uses CrewAI + Ollama to generate a **structured draft outline**:
+  - Title, Abstract (150–250 words)
+  - Introduction with numbered contributions
+  - Related Work (grounded in the synthesizer summary)
+  - Problem Statement
+  - Proposed Methodology
+  - Discussion
+  - Conclusion
+  - References (6–10 entries)
+- Download as **Markdown** or **plain text**
+- Output: `publisher_output.json` with `"mode": "research"`
+
+> **This is a starting point, not a finished paper.** The output gives you a structured idea and a gap to investigate — you still need to conduct actual experiments, gather real results, validate your approach, and write the final paper yourself before submitting to any platform or journal.
+
+### Trend Agent *(Topic discovery)*
+
+- Scans all enabled Google News RSS sources in parallel
+- Uses Ollama to extract the **top 5 trending AI topic phrases**
+- Falls back to inactive sources if too few headlines are found
+- Output: `trend_output.json`
+
+### Research Gap Agent *(Topic discovery — Research mode)*
+
+- Fetches recent papers from **5 research categories** in parallel (cs.AI, cs.LG, cs.CL, cs.CV, stat.ML)
+- Accepts an optional broad area to narrow the search (e.g. "computer vision")
+- Uses CrewAI + Ollama to identify **5 genuine research gaps** with title + gap description
+- Selecting a gap automatically enables Research Paper mode in the UI
+- Output: `research_gap_output.json`
 
 ---
 
 ## Testing
 
-The test suite covers every agent with mock unit tests and a full pipeline integration test. No Ollama server or internet connection is required — all external calls (DuckDuckGo, Ollama, Gmail, LinkedIn) are mocked.
-
-### Install test dependency
-
-```bash
-cd frontend
-uv add --dev pytest
-```
+The test suite covers every agent with mock unit tests and a full pipeline integration test. No Ollama server or internet connection required.
 
 ### Run all tests
 
@@ -193,8 +312,6 @@ uv add --dev pytest
 cd frontend
 uv run pytest ../backend/tests/ -v
 ```
-
-Expected output: **63 tests passing** in under 2 seconds.
 
 ### Run tests for a specific agent
 
@@ -204,30 +321,25 @@ uv run pytest ../backend/tests/test_analyst_agent.py -v
 uv run pytest ../backend/tests/test_synthesizer_agent.py -v
 uv run pytest ../backend/tests/test_publisher_agent.py -v
 uv run pytest ../backend/tests/test_trend_agent.py -v
-```
-
-### Run only the integration test
-
-```bash
 uv run pytest ../backend/tests/test_integration.py -v
 ```
 
 ### What is tested
 
-| File | Tests | Coverage |
-|------|-------|----------|
-| `test_researcher_agent.py` | 9 | Google News search, article curation, topic injection, JSON fallback, file output |
-| `test_analyst_agent.py` | 6 | Report schema, article count, file output, missing input error |
-| `test_synthesizer_agent.py` | 13 | Ollama HTTP calls, per-model success/error, final consolidation, model counts |
-| `test_publisher_agent.py` | 12 | Article display, output file writing, result structure |
-| `test_trend_agent.py` | 9 | Google News search, topic extraction, quote stripping, empty results, file output |
-| `test_integration.py` | 8 | Full pipeline sequence, inter-agent data flow, output schemas, topic arg, credentials, dependency chain |
+| File | Coverage |
+|------|----------|
+| `test_researcher_agent.py` | Google News search, full-content scraping, retry logic, topic injection, fallback sources, deduplication, file output |
+| `test_analyst_agent.py` | Report schema, full-content vs snippet usage, article count, file output |
+| `test_synthesizer_agent.py` | Parallel Ollama calls, per-model success/error, retry logic, consolidation, model counts |
+| `test_publisher_agent.py` | Article display, output file writing, result structure |
+| `test_trend_agent.py` | Google News search, topic extraction, quote stripping, empty results, file output |
+| `test_integration.py` | Full pipeline sequence, inter-agent data flow, output schemas, topic arg, dependency chain |
 
 ---
 
 ## Configuring Sources
 
-Open [config/sources.json](config/sources.json) and set `"enabled": true` for any sources you want to activate. By default, 3 sources are enabled:
+Open [config/sources.json](config/sources.json) and set `"enabled": true` for any sources you want to activate. The `enabled` flag controls which sources the **Trend Agent** scans. The **Researcher Agent** uses all sources regardless of this flag.
 
 ```json
 {
@@ -235,23 +347,21 @@ Open [config/sources.json](config/sources.json) and set `"enabled": true` for an
     {"query": "Anthropic research latest AI 2026", "label": "Anthropic Research", "enabled": true},
     {"query": "OpenAI blog latest news 2026",      "label": "OpenAI Blog",        "enabled": true},
     {"query": "Google DeepMind research 2026",     "label": "Google DeepMind",    "enabled": true},
-    {"query": "Meta AI blog latest 2026",          "label": "Meta AI Blog",       "enabled": false},
-    ...
+    {"query": "Meta AI blog latest 2026",          "label": "Meta AI Blog",       "enabled": false}
   ],
   "research": [
-    {"query": "site:arxiv.org/abs AI machine learning 2026", "label": "ArXiv", "enabled": false},
-    ...
+    {"query": "site:arxiv.org/abs AI machine learning 2026", "label": "Research Papers", "enabled": false}
   ]
 }
 ```
 
-Each enabled source triggers one Google News RSS fetch. To adjust token/context limits per agent, edit [config/tokens.json](config/tokens.json).
+To adjust token/context limits per agent, edit [config/tokens.json](config/tokens.json).
 
 ---
 
 ## Synthesizer Models
 
-Agent 3 queries these Ollama models and consolidates their responses:
+Agent 3 queries these Ollama models in parallel and consolidates their responses:
 
 | Model | Pull command | Required? |
 |-------|-------------|-----------|
@@ -265,31 +375,17 @@ To change the primary model, set `OLLAMA_MODEL=<model>` in your `.env`. To add o
 
 ---
 
-## Report Sections (Agent 2 Output)
+## Output
 
-Agent 2 uses Ollama to structure raw articles into a standardized 8-section report:
+| Mode | Output file | Download formats |
+|------|-------------|-----------------|
+| Article | `backend/output/publisher_output.json` | Markdown, plain text |
+| Research Paper | `backend/output/publisher_output.json` | Markdown, plain text |
 
-| # | Section | What it covers |
-|---|---------|----------------|
-| 1 | **Introduction** | Overview of latest trends and why they matter |
-| 2 | **Existing Problems** | Challenges that motivated new developments |
-| 3 | **Proposed Solutions** | New approaches, models, or methods introduced |
-| 4 | **Architecture Overview** | ASCII diagram of how the systems work |
-| 5 | **Advantages** | Benefits and improvements brought by the new work |
-| 6 | **Disadvantages** | Limitations, risks, and open problems |
-| 7 | **Applied AI Use Cases** | Real-world applications and industries impacted |
-| 8 | **Future Implementation** | Upcoming milestones and predictions |
+The output is always plain text — copy it to any platform:
 
----
-
-## Publishing the Article
-
-Agent 4 outputs a polished article to the console and saves it to `backend/output/publisher_output.json`. You can use this article to:
-
-- **LinkedIn** — copy and paste into a new LinkedIn post
-- **Medium / Substack / Dev.to** — paste directly as a blog post
-- **Email newsletter** — drop into your preferred email tool
-- **Any other platform** — the article is plain text, ready to go anywhere
+- **Article mode**: LinkedIn, Medium, Substack, Dev.to, email newsletter — ready to publish as-is
+- **Research Paper mode**: a draft idea and structure to build on — conduct your own research, run experiments, and write the real paper before submitting to any platform or journal
 
 ---
 
@@ -300,5 +396,7 @@ Agent 4 outputs a polished article to the console and saves it to `backend/outpu
 | Agent framework | Python + CrewAI |
 | Local LLMs | Ollama (llama3.2, mistral, qwen2.5, phi3, gemma2) |
 | Web search | Google News RSS (no API key required) |
+| Article scraping | BeautifulSoup4 |
+| Research paper source | Academic paper APIs (cs.AI, cs.LG, cs.CL, cs.CV, stat.ML categories) |
 | Dashboard | Streamlit (managed with uv) |
-| Output | Plain-text article (publish anywhere) |
+| Output | Plain-text article or research paper |
