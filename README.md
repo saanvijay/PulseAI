@@ -9,7 +9,7 @@ A multi-agent system that automatically fetches, organizes, summarizes, and disp
 | Mode | Topic source | Output |
 |------|-------------|--------|
 | **Article** | Trending topics or manual input | Blog post / LinkedIn article — ready to publish |
-| **Research Paper** | Research Gap Agent (unexplored areas in recent papers) | A draft outline and idea — a starting point for your own real research |
+| **Research Paper** | Research Gap Agent (unexplored areas in recent papers) | Draft outline (local) or full 12–15 page paper (cloud) — a starting point for your own real research |
 
 > **Important:** The Research Paper mode does **not** produce a publication-ready paper. It identifies a potential research gap and generates a structured draft to help you get started. The actual research, experiments, validation, and writing are yours to do before submitting anywhere.
 
@@ -65,7 +65,7 @@ Research Gap Agent (optional broad area input)
 │  Research Gap Agent                                             │
 │  Scans recent papers across 5 categories in parallel:           │
 │    cs.AI  ·  cs.LG  ·  cs.CL  ·  cs.CV  ·  stat.ML            │
-│  → Ollama identifies 5 genuine research gaps                    │
+│  → Identifies 5 genuine research gaps with descriptions         │
 │  User selects one gap topic                                     │
 └───────────────────────────┬─────────────────────────────────────┘
                             │ (topic + gap selected)
@@ -75,11 +75,19 @@ Research Gap Agent (optional broad area input)
                             ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │  Agent 4: Paper Writer                                          │
-│  CrewAI + Ollama generates a draft research paper outline:      │
+│                                                                 │
+│  LOCAL MODEL → compact draft (~2-3 pages, 6 sections)          │
 │    Abstract · Introduction · Related Work · Problem Statement   │
 │    Methodology · Discussion · Conclusion · References           │
+│                                                                 │
+│  CLOUD MODEL → full academic paper (~12-15 pages, 9 sections)  │
+│    Abstract · Keywords · Introduction · Background              │
+│    Related Work · Problem Formulation · Methodology             │
+│    Experimental Setup · Results · Discussion · Conclusion       │
+│    References (15-20 entries)                                   │
+│                                                                 │
 │  → A starting point — you do the real research & experiments    │
-│  → Download as text or Markdown to continue in your own editor  │
+│  → Download as Markdown or plain text                           │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -91,25 +99,26 @@ Research Gap Agent (optional broad area input)
 PulseAI/
 ├── config/
 │   ├── sources.json              # Search sources — set "enabled": true/false to toggle
-│   └── tokens.json               # Ollama context/token limits per agent
+│   └── tokens.json               # Token/context limits per agent
 ├── backend/
+│   ├── llm_factory.py            # Resolves which LLM each agent uses (local or cloud)
 │   ├── agents/
 │   │   ├── researcher_agent.py   # Google News RSS + full-content scraping + retry logic
-│   │   ├── analyst_agent.py      # CrewAI + Ollama content-driven report
-│   │   ├── synthesizer_agent.py  # 5 local Ollama models queried in parallel + consolidation
+│   │   ├── analyst_agent.py      # CrewAI + LLM content-driven report
+│   │   ├── synthesizer_agent.py  # 5 local Ollama models in parallel + LLM consolidation
 │   │   ├── publisher_agent.py    # Displays final article
-│   │   ├── paper_writer_agent.py # Writes structured research paper (research mode)
-│   │   ├── trend_agent.py        # Google News RSS + Ollama trend detection
-│   │   └── research_gap_agent.py # Scans recent papers + Ollama gap identification
+│   │   ├── paper_writer_agent.py # Draft (local) or full paper (cloud) in research mode
+│   │   ├── trend_agent.py        # Google News RSS + LLM trend detection
+│   │   └── research_gap_agent.py # Scans recent papers + LLM gap identification
 │   ├── output/                   # JSON outputs (created at runtime, gitignored)
 │   ├── tests/
-│   │   ├── conftest.py           # Shared pytest fixtures
+│   │   ├── conftest.py
 │   │   ├── test_researcher_agent.py
 │   │   ├── test_analyst_agent.py
 │   │   ├── test_synthesizer_agent.py
 │   │   ├── test_publisher_agent.py
 │   │   ├── test_trend_agent.py
-│   │   └── test_integration.py   # Full pipeline integration test
+│   │   └── test_integration.py
 │   └── orchestrator.py           # Runs all agents in sequence (article or research mode)
 ├── frontend/
 │   ├── app.py                    # Streamlit dashboard (tab-based UI)
@@ -196,20 +205,20 @@ The dashboard is tab-based:
 
 | Tab | Content |
 |-----|---------|
-| **🏠 Pipeline** | Topic selection, run buttons, status indicators |
+| **🏠 Pipeline** | Topic selection, run buttons, live status indicators |
 | **🔎 Researcher** | Fetched articles grouped by category (✦ = full content scraped) |
 | **📋 Analyst** | Structured technical report |
 | **🧠 Synthesizer** | Final consolidated summary + individual model responses |
 | **📤 Publisher** | Final article or research paper with download buttons |
 | **📡 Log** | Live streaming log with Stop button |
 
-**Topic selection** has three inner tabs in the Pipeline tab:
+**Topic selection** has three inner tabs inside the Pipeline tab:
 
 | Tab | How it works |
 |-----|-------------|
 | **✏️ Enter Manually** | Type any topic and set it directly |
-| **🔍 Trending Topics** | Runs Trend Agent → pick from 5 live trending topics |
-| **🔬 Research Gap** | Optional broad area → Runs Research Gap Agent → pick a gap topic → pipeline outputs a research paper |
+| **🔍 Trending Topics** | Runs Trend Agent → pick from 5 live trending topics → outputs an article |
+| **🔬 Research Gap** | Optional broad area → Runs Research Gap Agent → pick a gap topic → outputs a research paper |
 
 ### Option B — Command Line
 
@@ -253,47 +262,53 @@ python agents/research_gap_agent.py "computer vision"
 ### Agent 2 — Analyst
 
 - Uses **full scraped content** when available (falls back to RSS snippet)
-- Generates **6–9 content-driven section headings** based on what themes actually emerge from the articles — no fixed template
-- Each section includes specific references to models, companies, and numbers
+- Generates **6–9 content-driven section headings** based on what themes emerge from the articles — no fixed template
+- Each section references specific models, companies, and numbers
 - Output: `analyst_output.json`
 
 ### Agent 3 — Synthesizer
 
 - Queries all 5 Ollama models **in parallel** using `ThreadPoolExecutor` (up to 5x faster than sequential)
-- Each model produces independent analysis across 5 dimensions: Key Developments, Technical Insights, Industry Impact, Risks, What to Watch
-- CrewAI consolidates all successful responses into one **600–800 word final summary**
-- Missing models are skipped gracefully
-- **Retries** each Ollama call up to 3 times with backoff
+- Each model produces independent analysis: Key Developments, Technical Insights, Industry Impact, Risks, What to Watch
+- Consolidates all successful responses into one **600–800 word final summary**
+- Missing models are skipped gracefully; each call **retries** up to 3 times with backoff
 - Output: `synthesizer_output.json`
 
 ### Agent 4a — Publisher *(Article mode)*
 
-- Displays the final article to the console and saves it
+- Displays the final article and saves it
 - Download as **Markdown** or **plain text**
 - Ready to copy to LinkedIn, Medium, Substack, or any blog
 - Output: `publisher_output.json`
 
 ### Agent 4b — Paper Writer *(Research mode)*
 
-- Takes the synthesizer summary + selected research gap
-- Uses CrewAI + Ollama to generate a **structured draft outline**:
-  - Title, Abstract (150–250 words)
-  - Introduction with numbered contributions
-  - Related Work (grounded in the synthesizer summary)
-  - Problem Statement
-  - Proposed Methodology
-  - Discussion
-  - Conclusion
-  - References (6–10 entries)
-- Download as **Markdown** or **plain text**
-- Output: `publisher_output.json` with `"mode": "research"`
+Output quality depends on the model configured for `PAPER_WRITER`:
 
-> **This is a starting point, not a finished paper.** The output gives you a structured idea and a gap to investigate — you still need to conduct actual experiments, gather real results, validate your approach, and write the final paper yourself before submitting to any platform or journal.
+| Model type | Output |
+|-----------|--------|
+| **Local model** (default) | Compact draft ~2–3 pages, 6 sections. Good for quickly exploring the idea. |
+| **Cloud model** (optional) | Full academic paper ~12–15 pages (~6000–8000 words), 9 sections. Much more detailed and coherent. |
 
-### Trend Agent *(Topic discovery)*
+**Sections in cloud mode (full paper):**
+1. Abstract (250–300 words) + Keywords
+2. Introduction (700–900 words) — background, motivation, gap, contributions, paper organisation
+3. Background & Preliminaries (400–600 words) — key concepts, notation, foundations
+4. Related Work (900–1100 words) — 4–6 themed subsections, critical analysis of limitations
+5. Problem Formulation (500–700 words) — formal definition, assumptions, evaluation criteria
+6. Proposed Methodology (1200–1600 words) — architecture, algorithm/pseudocode, complexity, theoretical analysis
+7. Experimental Setup (600–800 words) — datasets, baselines, metrics, implementation details
+8. Expected Results & Analysis (700–900 words) — quantitative results, ablation study, qualitative analysis
+9. Discussion (500–600 words) — implications, limitations, broader impact
+10. Conclusion (300–400 words) — summary, future work
+11. References — 15–20 plausible entries
+
+> **This is a draft, not a finished paper.** The output gives you a structured idea and gap to investigate. You still need to conduct actual experiments, gather real results, validate your approach, and write the final paper yourself before submitting anywhere.
+
+### Trend Agent *(Topic discovery — Article mode)*
 
 - Scans all enabled Google News RSS sources in parallel
-- Uses Ollama to extract the **top 5 trending AI topic phrases**
+- Uses LLM to extract the **top 5 trending AI topic phrases**
 - Falls back to inactive sources if too few headlines are found
 - Output: `trend_output.json`
 
@@ -301,9 +316,74 @@ python agents/research_gap_agent.py "computer vision"
 
 - Fetches recent papers from **5 research categories** in parallel (cs.AI, cs.LG, cs.CL, cs.CV, stat.ML)
 - Accepts an optional broad area to narrow the search (e.g. "computer vision")
-- Uses CrewAI + Ollama to identify **5 genuine research gaps** with title + gap description
+- Uses LLM to identify **5 genuine research gaps** with title + gap description
 - Selecting a gap automatically enables Research Paper mode in the UI
 - Output: `research_gap_output.json`
+
+---
+
+## Cloud Models (Optional)
+
+By default every agent runs on local Ollama models — no API keys, no cost. If you want higher quality output (especially for the Research Paper mode), you can switch any agent to a cloud model.
+
+### How it works
+
+`backend/llm_factory.py` resolves which model each agent uses, in this priority order:
+
+| Priority | Env var | Scope |
+|----------|---------|-------|
+| 1 (highest) | `{AGENT}_MODEL` + `{AGENT}_PROVIDER` | Single agent override |
+| 2 | `LLM_MODEL` + `LLM_PROVIDER` | All agents at once |
+| 3 (default) | `OLLAMA_MODEL` + `OLLAMA_BASE_URL` | Local Ollama |
+
+Agent keys: `ANALYST`, `SYNTHESIZER`, `PAPER_WRITER`, `TREND`, `RESEARCH_GAP`
+
+### Option A — Upgrade all agents to a cloud model
+
+```env
+LLM_PROVIDER=anthropic
+LLM_MODEL=claude-opus-4-6
+ANTHROPIC_API_KEY=sk-ant-...
+```
+
+```env
+LLM_PROVIDER=openai
+LLM_MODEL=gpt-4o
+OPENAI_API_KEY=sk-...
+```
+
+### Option B — Upgrade only the Paper Writer (recommended)
+
+Keep everything else local and free. Only the paper writing step uses a cloud model:
+
+```env
+# All other agents stay on local Ollama
+OLLAMA_MODEL=llama3.2
+
+# Only the Paper Writer uses Claude
+PAPER_WRITER_PROVIDER=anthropic
+PAPER_WRITER_MODEL=claude-opus-4-6
+ANTHROPIC_API_KEY=sk-ant-...
+```
+
+### Supported providers
+
+| Provider | `_PROVIDER` value | Example models |
+|----------|------------------|----------------|
+| Ollama (local) | `ollama` | Any model pulled locally |
+| Anthropic | `anthropic` | `claude-opus-4-6`, `claude-sonnet-4-6` |
+| OpenAI | `openai` | `gpt-4o`, `gpt-4o-mini` |
+
+### Paper Writer output by model
+
+| Model | Pages | Words | Sections |
+|-------|-------|-------|---------|
+| Local (e.g. llama3.2) | ~2–3 | ~800–1200 | 6 |
+| Cloud (e.g. Claude, GPT-4o) | ~12–15 | ~6000–8000 | 9 + references |
+
+The Publisher tab shows a badge indicating which type was used (`☁️ cloud` or `💻 local`) so you always know what you got.
+
+> Even with cloud models the output is a **draft** — real research, experiments, and validation are still yours to do before submitting anywhere.
 
 ---
 
@@ -387,70 +467,8 @@ To change the primary model, set `OLLAMA_MODEL=<model>` in your `.env`. To add o
 | Article | `backend/output/publisher_output.json` | Markdown, plain text |
 | Research Paper | `backend/output/publisher_output.json` | Markdown, plain text |
 
-The output is always plain text — copy it to any platform:
-
-- **Article mode**: LinkedIn, Medium, Substack, Dev.to, email newsletter — ready to publish as-is
-- **Research Paper mode**: a draft idea and structure to build on — conduct your own research, run experiments, and write the real paper before submitting to any platform or journal
-
----
-
-## Cloud Models (Optional)
-
-By default every agent runs on local Ollama models — no API keys, no cost. If you want higher quality output (especially for the Research Paper mode), you can optionally switch any agent to a cloud model.
-
-### How it works
-
-A central `llm_factory.py` resolves which model each agent uses, in this priority order:
-
-| Priority | Env var | Example |
-|----------|---------|---------|
-| 1 (highest) | `{AGENT}_MODEL` + `{AGENT}_PROVIDER` | Per-agent override |
-| 2 | `LLM_MODEL` + `LLM_PROVIDER` | All agents at once |
-| 3 (default) | `OLLAMA_MODEL` + `OLLAMA_BASE_URL` | Local Ollama |
-
-Agent keys: `ANALYST`, `SYNTHESIZER`, `PAPER_WRITER`, `TREND`, `RESEARCH_GAP`
-
-### Option A — Upgrade all agents to a cloud model
-
-```env
-LLM_PROVIDER=anthropic
-LLM_MODEL=claude-opus-4-6
-ANTHROPIC_API_KEY=sk-ant-...
-```
-
-```env
-LLM_PROVIDER=openai
-LLM_MODEL=gpt-4o
-OPENAI_API_KEY=sk-...
-```
-
-### Option B — Upgrade only the Paper Writer (recommended)
-
-Keep everything local but use a cloud model just for writing the research paper draft, where output quality matters most:
-
-```env
-# All other agents stay on local Ollama
-OLLAMA_MODEL=llama3.2
-
-# Only the Paper Writer uses Claude
-PAPER_WRITER_PROVIDER=anthropic
-PAPER_WRITER_MODEL=claude-opus-4-6
-ANTHROPIC_API_KEY=sk-ant-...
-```
-
-### Supported providers
-
-| Provider | `_PROVIDER` value | Models |
-|----------|------------------|--------|
-| Ollama (local) | `ollama` | Any model pulled locally |
-| Anthropic | `anthropic` | `claude-opus-4-6`, `claude-sonnet-4-6`, etc. |
-| OpenAI | `openai` | `gpt-4o`, `gpt-4o-mini`, etc. |
-
-> **Paper length by model type:**
-> - **Local model** → compact draft (~2-3 pages, 6 sections). Local 7B models struggle with long coherent outputs.
-> - **Cloud model** → full academic paper (~12-15 pages, 9 sections + references, ~6000-8000 words): Abstract, Keywords, Introduction, Background & Preliminaries, Related Work, Problem Formulation, Methodology, Experimental Setup, Expected Results, Discussion, Conclusion, References.
->
-> Even with cloud models the output is a **draft** — real research, experiments, and validation are still yours to do before submitting anywhere.
+- **Article mode** — ready to publish as-is on LinkedIn, Medium, Substack, Dev.to, or any blog
+- **Research Paper mode** — a draft to build on. Conduct your own research, run experiments, and write the final paper before submitting anywhere
 
 ---
 
@@ -461,8 +479,9 @@ ANTHROPIC_API_KEY=sk-ant-...
 | Agent framework | Python + CrewAI |
 | Local LLMs (default) | Ollama (llama3.2, mistral, qwen2.5, phi3, gemma2) |
 | Cloud LLMs (optional) | Anthropic (Claude), OpenAI (GPT-4o) via `llm_factory.py` |
+| LLM routing | `backend/llm_factory.py` — per-agent or global provider override |
 | Web search | Google News RSS (no API key required) |
 | Article scraping | BeautifulSoup4 |
-| Research paper source | Academic paper APIs (cs.AI, cs.LG, cs.CL, cs.CV, stat.ML categories) |
+| Research paper source | Academic paper APIs (cs.AI, cs.LG, cs.CL, cs.CV, stat.ML) |
 | Dashboard | Streamlit (managed with uv) |
 | Output | Plain-text article or research paper draft |
