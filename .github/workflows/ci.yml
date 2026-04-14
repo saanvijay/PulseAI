@@ -28,11 +28,11 @@ jobs:
         working-directory: frontend
 
       - name: Lint with Ruff
-        run: uv run ruff check backend/ frontend/app.py
+        run: uv run ruff check ../backend/ app.py
         working-directory: frontend
 
       - name: Format check with Ruff
-        run: uv run ruff format --check backend/ frontend/app.py
+        run: uv run ruff format --check ../backend/ app.py
         working-directory: frontend
 
   # ── Tests ───────────────────────────────────────────────────────────────────
