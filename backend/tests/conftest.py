@@ -101,5 +101,3 @@ def synthesizer_output():
             "capabilities, and alignment research."
         ),
     }
-
-

@@ -239,7 +239,9 @@ class TestFullPipeline:
         assert isinstance(a["report"], str)
 
         s = json.loads(s_out.read_text())
-        assert all(k in s for k in ("timestamp", "models_queried", "models_successful", "model_responses", "final_summary"))
+        assert all(
+            k in s for k in ("timestamp", "models_queried", "models_successful", "model_responses", "final_summary")
+        )
         assert isinstance(s["model_responses"], list)
 
         p = json.loads(p_out.read_text())

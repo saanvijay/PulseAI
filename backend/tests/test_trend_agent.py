@@ -179,9 +179,7 @@ class TestGetTrendingTopic:
         self, mock_search, mock_get_llm, mock_agent, mock_task, mock_crew_cls, mock_output
     ):
         mock_search.return_value = []
-        mock_crew_cls.return_value.kickoff.return_value = self._make_crew_result(
-            "1. retrieval augmented generation"
-        )
+        mock_crew_cls.return_value.kickoff.return_value = self._make_crew_result("1. retrieval augmented generation")
         mock_output.parent.mkdir = MagicMock()
         mock_output.write_text = MagicMock()
 
