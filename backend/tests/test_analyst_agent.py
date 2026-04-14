@@ -45,6 +45,7 @@ class TestOrganizeContent:
         mock_output.write_text = MagicMock()
 
         from agents.analyst_agent import organize_content
+
         result = organize_content()
 
         assert "timestamp" in result
@@ -65,6 +66,7 @@ class TestOrganizeContent:
         mock_output.write_text = MagicMock()
 
         from agents.analyst_agent import organize_content
+
         result = organize_content()
 
         assert result["source_articles"] == len(researcher_output["articles"])
@@ -83,6 +85,7 @@ class TestOrganizeContent:
         mock_output.write_text = MagicMock()
 
         from agents.analyst_agent import organize_content
+
         result = organize_content()
 
         assert isinstance(result["report"], str)
@@ -102,6 +105,7 @@ class TestOrganizeContent:
         mock_output.write_text = MagicMock()
 
         from agents.analyst_agent import organize_content
+
         organize_content()
 
         mock_output.write_text.assert_called_once()
@@ -124,6 +128,7 @@ class TestOrganizeContent:
         mock_output.write_text = MagicMock()
 
         from agents.analyst_agent import organize_content
+
         organize_content()
 
         mock_crew_cls.return_value.kickoff.assert_called_once()
@@ -133,5 +138,6 @@ class TestOrganizeContent:
         mock_input.read_text.side_effect = FileNotFoundError("researcher_output.json not found")
 
         from agents.analyst_agent import organize_content
+
         with pytest.raises(FileNotFoundError):
             organize_content()

@@ -6,7 +6,6 @@
 #   Cloud model  → full academic paper (~12-15 pages, 9 sections + references)
 
 import json
-import os
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -15,15 +14,16 @@ from dotenv import load_dotenv
 from llm_factory import get_llm, is_cloud_provider
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
-BASE_DIR     = Path(__file__).parent.parent
+BASE_DIR = Path(__file__).parent.parent
 load_dotenv(BASE_DIR.parent / ".env")
 
-SYNTH_FILE   = BASE_DIR / "output" / "synthesizer_output.json"
-GAP_FILE     = BASE_DIR / "output" / "research_gap_output.json"
+SYNTH_FILE = BASE_DIR / "output" / "synthesizer_output.json"
+GAP_FILE = BASE_DIR / "output" / "research_gap_output.json"
 ANALYST_FILE = BASE_DIR / "output" / "analyst_output.json"
-OUTPUT_FILE  = BASE_DIR / "output" / "publisher_output.json"
+OUTPUT_FILE = BASE_DIR / "output" / "publisher_output.json"
 
 # ── Prompts ───────────────────────────────────────────────────────────────────
+
 
 def _local_prompt(topic: str, gap: str, related_work: str) -> str:
     """Compact prompt for local models — realistic for 7B parameter models."""
@@ -211,20 +211,21 @@ Write in formal, precise academic English throughout. Every section must be comp
 
 # ── Paper writer via CrewAI ───────────────────────────────────────────────────
 
+
 def write_paper(topic: str, gap: str, related_work: str) -> str:
-    llm        = get_llm("PAPER_WRITER")
+    llm = get_llm("PAPER_WRITER")
     cloud_mode = is_cloud_provider("PAPER_WRITER")
 
     if cloud_mode:
         print("  Mode: FULL PAPER (cloud model — targeting 12-15 pages)", flush=True)
-        prompt          = _cloud_prompt(topic, gap, related_work)
+        prompt = _cloud_prompt(topic, gap, related_work)
         expected_output = (
             "A complete 12-15 page academic research paper with Title, Authors, Abstract, "
             "Keywords, and 9 numbered sections plus References."
         )
     else:
         print("  Mode: DRAFT (local model — compact outline)", flush=True)
-        prompt          = _local_prompt(topic, gap, related_work)
+        prompt = _local_prompt(topic, gap, related_work)
         expected_output = "A concise research paper draft with Title, Abstract, and 6 numbered sections."
 
     writer = Agent(
@@ -245,11 +246,13 @@ def write_paper(topic: str, gap: str, related_work: str) -> str:
         agent=writer,
     )
 
-    crew   = Crew(agents=[writer], tasks=[task], verbose=False)
+    crew = Crew(agents=[writer], tasks=[task], verbose=False)
     result = crew.kickoff()
     return str(result)
 
+
 # ── Resolve gap description for the current topic ─────────────────────────────
+
 
 def _resolve_gap(topic: str) -> str:
     if not GAP_FILE.exists():
@@ -265,14 +268,16 @@ def _resolve_gap(topic: str) -> str:
     except Exception:
         return ""
 
+
 # ── Main agent function ────────────────────────────────────────────────────────
+
 
 def write_research_paper() -> dict:
     print("Agent 4 (Research Mode): Writing research paper...", flush=True)
 
-    synth_data    = json.loads(SYNTH_FILE.read_text())
+    synth_data = json.loads(SYNTH_FILE.read_text())
     final_summary = synth_data.get("final_summary", "")
-    topic         = synth_data.get("topic", "")
+    topic = synth_data.get("topic", "")
 
     if not topic and ANALYST_FILE.exists():
         topic = json.loads(ANALYST_FILE.read_text()).get("topic", "")
@@ -291,13 +296,13 @@ def write_research_paper() -> dict:
     print("=" * 60 + "\n", flush=True)
 
     results = {
-        "timestamp":     datetime.now(timezone.utc).isoformat(),
-        "mode":          "research",
-        "cloud":         is_cloud_provider("PAPER_WRITER"),
-        "topic":         topic,
-        "gap":           gap,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "mode": "research",
+        "cloud": is_cloud_provider("PAPER_WRITER"),
+        "topic": topic,
+        "gap": gap,
         "final_article": paper,
-        "status":        "displayed",
+        "status": "displayed",
     }
 
     OUTPUT_FILE.write_text(json.dumps(results, indent=2))

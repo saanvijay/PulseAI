@@ -4,7 +4,6 @@
 # If the primary sources return too few results, 3 fallback sources are tried.
 
 import json
-import os
 import random
 import re
 import urllib.parse
@@ -27,7 +26,7 @@ OUTPUT_FILE = BASE_DIR / "output" / "trend_output.json"
 # ── Config ────────────────────────────────────────────────────────────────────
 
 CONFIG_DIR = BASE_DIR.parent / "config"
-SOURCES    = json.loads((CONFIG_DIR / "sources.json").read_text())
+SOURCES = json.loads((CONFIG_DIR / "sources.json").read_text())
 
 ACTIVE_SOURCES = [
     {"query": s["query"], "label": s["label"], "category": cat}
@@ -49,15 +48,16 @@ MIN_HEADLINES = 5
 # ── Google News RSS helper ────────────────────────────────────────────────────
 
 _GNEWS_RSS = "https://news.google.com/rss/search"
-_HEADERS   = {"User-Agent": "Mozilla/5.0"}
+_HEADERS = {"User-Agent": "Mozilla/5.0"}
+
 
 def gnews_search(source: dict, max_results: int = 5) -> tuple[dict, list[dict]]:
     """Fetch headlines for one source. Returns (source, results) for use in futures."""
     try:
-        url  = f"{_GNEWS_RSS}?q={urllib.parse.quote(source['query'])}&hl=en-US&gl=US&ceid=US:en"
+        url = f"{_GNEWS_RSS}?q={urllib.parse.quote(source['query'])}&hl=en-US&gl=US&ceid=US:en"
         resp = requests.get(url, headers=_HEADERS, timeout=15)
         resp.raise_for_status()
-        root  = ET.fromstring(resp.content)
+        root = ET.fromstring(resp.content)
         items = root.findall(".//item")[:max_results]
         results = [{"title": item.findtext("title", ""), "source": item.findtext("source", "")} for item in items]
         return source, results
@@ -65,7 +65,9 @@ def gnews_search(source: dict, max_results: int = 5) -> tuple[dict, list[dict]]:
         print(f"  [ERROR] {source['label']}: {e}")
         return source, []
 
+
 # ── Parallel search ───────────────────────────────────────────────────────────
+
 
 def search_sources_parallel(sources: list[dict], max_results: int = 5) -> list[str]:
     """Search all sources in parallel, log each as it starts and completes."""
@@ -87,7 +89,9 @@ def search_sources_parallel(sources: list[dict], max_results: int = 5) -> list[s
 
     return snippets
 
+
 # ── Main agent function ────────────────────────────────────────────────────────
+
 
 def get_trending_topic() -> dict:
     print(f"Trend Agent: Scanning {len(ACTIVE_SOURCES)} active sources in parallel...", flush=True)
@@ -100,8 +104,9 @@ def get_trending_topic() -> dict:
     if len(snippets) < MIN_HEADLINES and FALLBACK_SOURCES:
         fallback = random.sample(FALLBACK_SOURCES, min(3, len(FALLBACK_SOURCES)))
         fallback_names = [s["label"] for s in fallback]
-        print(f"\n  Not enough results ({len(snippets)} headlines). "
-              f"Trying fallback sources: {', '.join(fallback_names)}")
+        print(
+            f"\n  Not enough results ({len(snippets)} headlines). Trying fallback sources: {', '.join(fallback_names)}"
+        )
         fallback_snippets = search_sources_parallel(fallback, max_results=5)
         snippets.extend(fallback_snippets)
         sources_used.extend(fallback_names)
@@ -126,7 +131,7 @@ def get_trending_topic() -> dict:
     task = Task(
         description=f"""IMPORTANT: Respond in English only. Do not use any other language.
 
-Below are the latest AI headlines from: {', '.join(sources_used)}.
+Below are the latest AI headlines from: {", ".join(sources_used)}.
 
 HEADLINES:
 {headlines_text}
@@ -147,21 +152,21 @@ Example format:
         agent=analyst,
     )
 
-    crew        = Crew(agents=[analyst], tasks=[task], verbose=False)
-    result      = crew.kickoff()
+    crew = Crew(agents=[analyst], tasks=[task], verbose=False)
+    result = crew.kickoff()
     output_text = str(result).strip()
 
     # Parse the numbered list into a Python list
     topics = []
     for line in output_text.splitlines():
-        line  = line.strip()
+        line = line.strip()
         match = re.match(r"^\d+[\.\)]\s*(.+)$", line)
         if match:
             topics.append(match.group(1).strip().strip('"').strip("'"))
 
     # Fallback: split by newline if regex found nothing
     if not topics:
-        topics = [l.strip() for l in output_text.splitlines() if l.strip()]
+        topics = [line.strip() for line in output_text.splitlines() if line.strip()]
 
     topics = topics[:5]
 
@@ -170,9 +175,9 @@ Example format:
         print(f"    {i}. {t}")
 
     output = {
-        "timestamp":       datetime.now(timezone.utc).isoformat(),
-        "topics":          topics,
-        "topic":           topics[0] if topics else "",  # backwards compatibility
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "topics": topics,
+        "topic": topics[0] if topics else "",  # backwards compatibility
         "sources_scanned": sources_used,
     }
 

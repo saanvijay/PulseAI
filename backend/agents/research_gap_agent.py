@@ -3,7 +3,6 @@
 # Output is a list of 5 gap topics the user can pick from, similar to Trend Agent.
 
 import json
-import os
 import random
 import re
 import sys
@@ -27,13 +26,14 @@ OUTPUT_FILE = BASE_DIR / "output" / "research_gap_output.json"
 # ── Config ────────────────────────────────────────────────────────────────────
 
 # ArXiv categories to scan
-ARXIV_API        = "http://export.arxiv.org/api/query"
+ARXIV_API = "http://export.arxiv.org/api/query"
 ARXIV_CATEGORIES = ["cs.AI", "cs.LG", "cs.CL", "cs.CV", "stat.ML"]
-PAPERS_PER_CAT   = 10
+PAPERS_PER_CAT = 10
 
 # ── Research paper fetcher ────────────────────────────────────────────────────
 
 _HEADERS = {"User-Agent": "Mozilla/5.0"}
+
 
 def fetch_arxiv(category: str, broad_topic: str = "", max_results: int = PAPERS_PER_CAT) -> tuple[str, list[dict]]:
     """Fetch recent papers from one research paper category. Returns (category, papers)."""
@@ -47,22 +47,22 @@ def fetch_arxiv(category: str, broad_topic: str = "", max_results: int = PAPERS_
         start = random.randint(0, 15)
         params = {
             "search_query": query,
-            "sortBy":       "submittedDate",
-            "sortOrder":    "descending",
-            "start":        start,
-            "max_results":  max_results,
+            "sortBy": "submittedDate",
+            "sortOrder": "descending",
+            "start": start,
+            "max_results": max_results,
         }
-        url  = f"{ARXIV_API}?{urllib.parse.urlencode(params)}"
+        url = f"{ARXIV_API}?{urllib.parse.urlencode(params)}"
         resp = requests.get(url, headers=_HEADERS, timeout=20)
         resp.raise_for_status()
 
         root = ET.fromstring(resp.content)
-        ns   = {"atom": "http://www.w3.org/2005/Atom"}
+        ns = {"atom": "http://www.w3.org/2005/Atom"}
         papers = []
         for entry in root.findall("atom:entry", ns):
-            title    = (entry.findtext("atom:title",   "", ns) or "").strip().replace("\n", " ")
+            title = (entry.findtext("atom:title", "", ns) or "").strip().replace("\n", " ")
             abstract = (entry.findtext("atom:summary", "", ns) or "").strip().replace("\n", " ")[:400]
-            link     = (entry.findtext("atom:id",      "", ns) or "").strip()
+            link = (entry.findtext("atom:id", "", ns) or "").strip()
             if title:
                 papers.append({"title": title, "abstract": abstract, "link": link})
         print(f"  [{category}] {len(papers)} papers fetched", flush=True)
@@ -71,7 +71,9 @@ def fetch_arxiv(category: str, broad_topic: str = "", max_results: int = PAPERS_
         print(f"  [{category}] Failed: {e}", flush=True)
         return category, []
 
+
 # ── Gap analysis via CrewAI + Ollama ──────────────────────────────────────────
+
 
 def find_gaps(papers: list[dict], broad_topic: str = "") -> list[dict]:
     # Shuffle so each run sees a different ordering / subset of papers
@@ -79,10 +81,7 @@ def find_gaps(papers: list[dict], broad_topic: str = "") -> list[dict]:
     random.shuffle(shuffled)
     subset = random.sample(shuffled, min(20, len(shuffled))) if len(shuffled) > 20 else shuffled
 
-    papers_text = "\n\n".join(
-        f"Title: {p['title']}\nAbstract: {p['abstract']}"
-        for p in subset
-    )
+    papers_text = "\n\n".join(f"Title: {p['title']}\nAbstract: {p['abstract']}" for p in subset)
 
     llm = get_llm("RESEARCH_GAP", temperature=0.9)
 
@@ -136,12 +135,12 @@ Return exactly 5 lines. No extra text.""",
         agent=analyst,
     )
 
-    crew   = Crew(agents=[analyst], tasks=[task], verbose=False)
+    crew = Crew(agents=[analyst], tasks=[task], verbose=False)
     result = str(crew.kickoff()).strip()
 
     gaps = []
     for line in result.splitlines():
-        line  = line.strip()
+        line = line.strip()
         match = re.match(r"^\d+[\.\)]\s*(.+)$", line)
         if not match:
             continue
@@ -154,19 +153,18 @@ Return exactly 5 lines. No extra text.""",
 
     return gaps[:5]
 
+
 # ── Main agent function ────────────────────────────────────────────────────────
+
 
 def discover_research_gaps(broad_topic: str = "") -> dict:
     print("Research Gap Agent: Fetching recent research papers...", flush=True)
     if broad_topic:
-        print(f"  Broad area: \"{broad_topic}\"", flush=True)
+        print(f'  Broad area: "{broad_topic}"', flush=True)
 
     all_papers: list[dict] = []
     with ThreadPoolExecutor(max_workers=len(ARXIV_CATEGORIES)) as executor:
-        futures = {
-            executor.submit(fetch_arxiv, cat, broad_topic): cat
-            for cat in ARXIV_CATEGORIES
-        }
+        futures = {executor.submit(fetch_arxiv, cat, broad_topic): cat for cat in ARXIV_CATEGORIES}
         for future in as_completed(futures):
             _, papers = future.result()
             all_papers.extend(papers)
@@ -175,17 +173,17 @@ def discover_research_gaps(broad_topic: str = "") -> dict:
 
     gaps = find_gaps(all_papers, broad_topic)
 
-    print(f"\n  Research gaps found:")
+    print("\n  Research gaps found:")
     for i, g in enumerate(gaps, 1):
         print(f"    {i}. {g['topic']}")
         if g.get("gap"):
             print(f"       Gap: {g['gap']}")
 
     output = {
-        "timestamp":      datetime.now(timezone.utc).isoformat(),
-        "broad_topic":    broad_topic or "General AI/ML",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "broad_topic": broad_topic or "General AI/ML",
         "papers_scanned": len(all_papers),
-        "gaps":           gaps,
+        "gaps": gaps,
     }
 
     OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)

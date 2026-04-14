@@ -18,7 +18,6 @@ The integration test verifies:
 
 import json
 import os
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -76,22 +75,22 @@ def _make_ollama_response(text: str):
 
 def _patch_agent_files(tmp_path, monkeypatch):
     """Redirect all agent INPUT_FILE / OUTPUT_FILE paths to tmp_path."""
-    researcher_out  = tmp_path / "researcher_output.json"
-    analyst_out     = tmp_path / "analyst_output.json"
+    researcher_out = tmp_path / "researcher_output.json"
+    analyst_out = tmp_path / "analyst_output.json"
     synthesizer_out = tmp_path / "synthesizer_output.json"
-    publisher_out   = tmp_path / "publisher_output.json"
+    publisher_out = tmp_path / "publisher_output.json"
 
-    import agents.researcher_agent  as ra
-    import agents.analyst_agent     as aa
+    import agents.analyst_agent as aa
+    import agents.publisher_agent as pa
+    import agents.researcher_agent as ra
     import agents.synthesizer_agent as sa
-    import agents.publisher_agent   as pa
 
     monkeypatch.setattr(ra, "OUTPUT_FILE", researcher_out)
-    monkeypatch.setattr(aa, "INPUT_FILE",  researcher_out)
+    monkeypatch.setattr(aa, "INPUT_FILE", researcher_out)
     monkeypatch.setattr(aa, "OUTPUT_FILE", analyst_out)
-    monkeypatch.setattr(sa, "INPUT_FILE",  analyst_out)
+    monkeypatch.setattr(sa, "INPUT_FILE", analyst_out)
     monkeypatch.setattr(sa, "OUTPUT_FILE", synthesizer_out)
-    monkeypatch.setattr(pa, "INPUT_FILE",  synthesizer_out)
+    monkeypatch.setattr(pa, "INPUT_FILE", synthesizer_out)
     monkeypatch.setattr(pa, "OUTPUT_FILE", publisher_out)
 
     return researcher_out, analyst_out, synthesizer_out, publisher_out
@@ -122,20 +121,27 @@ _SYNTH_PATCHES = [
 
 # ── Integration: Full pipeline ────────────────────────────────────────────────
 
-class TestFullPipeline:
 
+class TestFullPipeline:
     def _setup_mocks(
         self,
         mock_ddg,
-        mock_researcher_agent, mock_researcher_task, mock_researcher_crew, mock_researcher_llm,
-        mock_analyst_agent,   mock_analyst_task,   mock_analyst_crew,   mock_analyst_llm,
-        mock_synth_agent,     mock_synth_task,     mock_synth_crew,     mock_synth_llm,
+        mock_researcher_agent,
+        mock_researcher_task,
+        mock_researcher_crew,
+        mock_researcher_llm,
+        mock_analyst_agent,
+        mock_analyst_task,
+        mock_analyst_crew,
+        mock_analyst_llm,
+        mock_synth_agent,
+        mock_synth_task,
+        mock_synth_crew,
+        mock_synth_llm,
         mock_synth_post,
     ):
         mock_ddg.return_value = [{"title": "t", "body": "s", "href": "http://x.com"}]
-        mock_researcher_crew.return_value.kickoff.return_value = _make_crew_result(
-            json.dumps(SAMPLE_ARTICLES)
-        )
+        mock_researcher_crew.return_value.kickoff.return_value = _make_crew_result(json.dumps(SAMPLE_ARTICLES))
         mock_analyst_crew.return_value.kickoff.return_value = _make_crew_result(SAMPLE_REPORT)
         mock_synth_post.return_value = _make_ollama_response("Key insight.")
         mock_synth_crew.return_value.kickoff.return_value = _make_crew_result(FINAL_SUMMARY)
@@ -156,10 +162,22 @@ class TestFullPipeline:
     @patch("agents.researcher_agent.Agent")
     def test_pipeline_runs_all_four_agents(
         self,
-        mock_r_agent, mock_r_task, mock_r_crew, mock_r_llm, mock_ddg,
-        mock_a_agent, mock_a_task, mock_a_crew, mock_a_llm,
-        mock_s_agent, mock_s_task, mock_s_crew, mock_s_llm, mock_s_post,
-        tmp_path, monkeypatch,
+        mock_r_agent,
+        mock_r_task,
+        mock_r_crew,
+        mock_r_llm,
+        mock_ddg,
+        mock_a_agent,
+        mock_a_task,
+        mock_a_crew,
+        mock_a_llm,
+        mock_s_agent,
+        mock_s_task,
+        mock_s_crew,
+        mock_s_llm,
+        mock_s_post,
+        tmp_path,
+        monkeypatch,
     ):
         r_out, a_out, s_out, p_out = _patch_agent_files(tmp_path, monkeypatch)
         for key in ("EMAIL_USER", "EMAIL_PASS", "EMAIL_TO", "LINKEDIN_ACCESS_TOKEN", "LINKEDIN_PERSON_ID"):
@@ -172,6 +190,7 @@ class TestFullPipeline:
         mock_s_crew.return_value.kickoff.return_value = _make_crew_result(FINAL_SUMMARY)
 
         from orchestrator import run_pipeline
+
         run_pipeline()
 
         assert r_out.exists(), "researcher_output.json was not created"
@@ -195,10 +214,22 @@ class TestFullPipeline:
     @patch("agents.researcher_agent.Agent")
     def test_data_flows_correctly_between_agents(
         self,
-        mock_r_agent, mock_r_task, mock_r_crew, mock_r_llm, mock_ddg,
-        mock_a_agent, mock_a_task, mock_a_crew, mock_a_llm,
-        mock_s_agent, mock_s_task, mock_s_crew, mock_s_llm, mock_s_post,
-        tmp_path, monkeypatch,
+        mock_r_agent,
+        mock_r_task,
+        mock_r_crew,
+        mock_r_llm,
+        mock_ddg,
+        mock_a_agent,
+        mock_a_task,
+        mock_a_crew,
+        mock_a_llm,
+        mock_s_agent,
+        mock_s_task,
+        mock_s_crew,
+        mock_s_llm,
+        mock_s_post,
+        tmp_path,
+        monkeypatch,
     ):
         r_out, a_out, s_out, p_out = _patch_agent_files(tmp_path, monkeypatch)
         for key in ("EMAIL_USER", "EMAIL_PASS", "EMAIL_TO", "LINKEDIN_ACCESS_TOKEN", "LINKEDIN_PERSON_ID"):
@@ -211,6 +242,7 @@ class TestFullPipeline:
         mock_s_crew.return_value.kickoff.return_value = _make_crew_result(FINAL_SUMMARY)
 
         from orchestrator import run_pipeline
+
         run_pipeline()
 
         r_data = json.loads(r_out.read_text())
@@ -244,10 +276,22 @@ class TestFullPipeline:
     @patch("agents.researcher_agent.Agent")
     def test_pipeline_output_schemas_are_valid(
         self,
-        mock_r_agent, mock_r_task, mock_r_crew, mock_r_llm, mock_ddg,
-        mock_a_agent, mock_a_task, mock_a_crew, mock_a_llm,
-        mock_s_agent, mock_s_task, mock_s_crew, mock_s_llm, mock_s_post,
-        tmp_path, monkeypatch,
+        mock_r_agent,
+        mock_r_task,
+        mock_r_crew,
+        mock_r_llm,
+        mock_ddg,
+        mock_a_agent,
+        mock_a_task,
+        mock_a_crew,
+        mock_a_llm,
+        mock_s_agent,
+        mock_s_task,
+        mock_s_crew,
+        mock_s_llm,
+        mock_s_post,
+        tmp_path,
+        monkeypatch,
     ):
         r_out, a_out, s_out, p_out = _patch_agent_files(tmp_path, monkeypatch)
         for key in ("EMAIL_USER", "EMAIL_PASS", "EMAIL_TO", "LINKEDIN_ACCESS_TOKEN", "LINKEDIN_PERSON_ID"):
@@ -260,6 +304,7 @@ class TestFullPipeline:
         mock_s_crew.return_value.kickoff.return_value = _make_crew_result(FINAL_SUMMARY)
 
         from orchestrator import run_pipeline
+
         run_pipeline()
 
         r = json.loads(r_out.read_text())
@@ -270,7 +315,9 @@ class TestFullPipeline:
         assert isinstance(a["report"], str)
 
         s = json.loads(s_out.read_text())
-        assert all(k in s for k in ("timestamp", "models_queried", "models_successful", "model_responses", "final_summary"))
+        assert all(
+            k in s for k in ("timestamp", "models_queried", "models_successful", "model_responses", "final_summary")
+        )
         assert isinstance(s["model_responses"], list)
 
         p = json.loads(p_out.read_text())
@@ -294,10 +341,22 @@ class TestFullPipeline:
     @patch("agents.researcher_agent.Agent")
     def test_pipeline_with_topic_argument(
         self,
-        mock_r_agent, mock_r_task, mock_r_crew, mock_r_llm, mock_ddg,
-        mock_a_agent, mock_a_task, mock_a_crew, mock_a_llm,
-        mock_s_agent, mock_s_task, mock_s_crew, mock_s_llm, mock_s_post,
-        tmp_path, monkeypatch,
+        mock_r_agent,
+        mock_r_task,
+        mock_r_crew,
+        mock_r_llm,
+        mock_ddg,
+        mock_a_agent,
+        mock_a_task,
+        mock_a_crew,
+        mock_a_llm,
+        mock_s_agent,
+        mock_s_task,
+        mock_s_crew,
+        mock_s_llm,
+        mock_s_post,
+        tmp_path,
+        monkeypatch,
     ):
         r_out, a_out, s_out, p_out = _patch_agent_files(tmp_path, monkeypatch)
         for key in ("EMAIL_USER", "EMAIL_PASS", "EMAIL_TO", "LINKEDIN_ACCESS_TOKEN", "LINKEDIN_PERSON_ID"):
@@ -310,6 +369,7 @@ class TestFullPipeline:
         mock_s_crew.return_value.kickoff.return_value = _make_crew_result(FINAL_SUMMARY)
 
         from orchestrator import run_pipeline
+
         run_pipeline(topic="agentic AI systems")
 
         r = json.loads(r_out.read_text())
@@ -333,11 +393,24 @@ class TestFullPipeline:
     @patch("agents.researcher_agent.Agent")
     def test_pipeline_with_publisher_credentials(
         self,
-        mock_r_agent, mock_r_task, mock_r_crew, mock_r_llm, mock_ddg,
-        mock_a_agent, mock_a_task, mock_a_crew, mock_a_llm,
-        mock_s_agent, mock_s_task, mock_s_crew, mock_s_llm, mock_s_post,
-        mock_send_email, mock_post_li,
-        tmp_path, monkeypatch,
+        mock_r_agent,
+        mock_r_task,
+        mock_r_crew,
+        mock_r_llm,
+        mock_ddg,
+        mock_a_agent,
+        mock_a_task,
+        mock_a_crew,
+        mock_a_llm,
+        mock_s_agent,
+        mock_s_task,
+        mock_s_crew,
+        mock_s_llm,
+        mock_s_post,
+        mock_send_email,
+        mock_post_li,
+        tmp_path,
+        monkeypatch,
     ):
         r_out, a_out, s_out, p_out = _patch_agent_files(tmp_path, monkeypatch)
 
@@ -353,12 +426,13 @@ class TestFullPipeline:
         env = {
             "EMAIL_USER": "u@g.com",
             "EMAIL_PASS": "pw",
-            "EMAIL_TO":   "t@g.com",
+            "EMAIL_TO": "t@g.com",
             "LINKEDIN_ACCESS_TOKEN": "token",
-            "LINKEDIN_PERSON_ID":    "pid",
+            "LINKEDIN_PERSON_ID": "pid",
         }
         with patch.dict("os.environ", env):
             from orchestrator import run_pipeline
+
             run_pipeline()
 
         mock_send_email.assert_called_once()
@@ -374,26 +448,32 @@ class TestFullPipeline:
     def test_analyst_fails_if_researcher_output_missing(self, tmp_path, monkeypatch):
         """Analyst agent must raise if researcher_output.json doesn't exist."""
         import agents.analyst_agent as aa
+
         monkeypatch.setattr(aa, "INPUT_FILE", tmp_path / "researcher_output.json")
 
         from agents.analyst_agent import organize_content
+
         with pytest.raises((FileNotFoundError, OSError)):
             organize_content()
 
     def test_synthesizer_fails_if_analyst_output_missing(self, tmp_path, monkeypatch):
         """Synthesizer must raise if analyst_output.json doesn't exist."""
         import agents.synthesizer_agent as sa
+
         monkeypatch.setattr(sa, "INPUT_FILE", tmp_path / "analyst_output.json")
 
         from agents.synthesizer_agent import summarize_with_multiple_models
+
         with pytest.raises((FileNotFoundError, OSError)):
             summarize_with_multiple_models()
 
     def test_publisher_fails_if_synthesizer_output_missing(self, tmp_path, monkeypatch):
         """Publisher must raise if synthesizer_output.json doesn't exist."""
         import agents.publisher_agent as pa
+
         monkeypatch.setattr(pa, "INPUT_FILE", tmp_path / "synthesizer_output.json")
 
         from agents.publisher_agent import publish_results
+
         with pytest.raises((FileNotFoundError, OSError)):
             publish_results()

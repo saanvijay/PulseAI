@@ -8,6 +8,7 @@ import subprocess
 import sys
 import threading
 import time
+
 import streamlit as st
 
 # ── Page config ──────────────────────────────────────────────────────────────
@@ -17,18 +18,18 @@ st.set_page_config(
     layout="wide",
 )
 
-ROOT_DIR    = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BACKEND_DIR = os.path.join(ROOT_DIR, "backend")
-OUTPUT_DIR  = os.path.join(BACKEND_DIR, "output")
+OUTPUT_DIR = os.path.join(BACKEND_DIR, "output")
 
 
 # ── Session state ─────────────────────────────────────────────────────────────
 
 for key, default in [
-    ("topic",              ""),
-    ("trend_topics",       []),
-    ("research_mode",      False),
-    ("research_gap_items", []),   # list of {topic, gap} dicts from research_gap_agent
+    ("topic", ""),
+    ("trend_topics", []),
+    ("research_mode", False),
+    ("research_gap_items", []),  # list of {topic, gap} dicts from research_gap_agent
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
@@ -36,12 +37,14 @@ for key, default in [
 
 # ── Shared agent state (cache_resource = safe for background threads) ─────────
 
+
 @st.cache_resource
 def get_agent_state():
     return {"running": None, "logs": [], "process": None, "done": False}
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
 
 def load_json(filename):
     filepath = os.path.join(OUTPUT_DIR, filename)
@@ -59,12 +62,17 @@ _STEP_LABELS = {
     "[Step 4/4]": "Publisher Agent",
 }
 
+
 def _agent_thread(agent_name, script_path, extra_args=()):
     state = get_agent_state()
-    cmd   = [sys.executable, "-u", script_path, *extra_args]
-    proc  = subprocess.Popen(
-        cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-        text=True, bufsize=1, cwd=BACKEND_DIR,
+    cmd = [sys.executable, "-u", script_path, *extra_args]
+    proc = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+        cwd=BACKEND_DIR,
         env={**os.environ, "PYTHONUNBUFFERED": "1", "PYTHONPATH": BACKEND_DIR},
     )
     state["process"] = proc
@@ -80,10 +88,10 @@ def _agent_thread(agent_name, script_path, extra_args=()):
                         break
     proc.stdout.close()
     proc.wait()
-    state["running"]    = None
+    state["running"] = None
     state["last_agent"] = agent_name
-    state["done"]       = True
-    state["process"]    = None
+    state["done"] = True
+    state["process"] = None
 
 
 def launch_agent(agent_name, script_path, extra_args=()):
@@ -93,29 +101,34 @@ def launch_agent(agent_name, script_path, extra_args=()):
 
 
 def status_badge(status):
-    if status == "success": return "✅ Success"
-    if status == "error":   return "❌ Error"
-    if status == "skipped": return "⏭️ Skipped"
+    if status == "success":
+        return "✅ Success"
+    if status == "error":
+        return "❌ Error"
+    if status == "skipped":
+        return "⏭️ Skipped"
     return status
 
 
 # ── State ─────────────────────────────────────────────────────────────────────
 
 state = get_agent_state()
-busy  = state["running"] is not None
+busy = state["running"] is not None
 
 st.title("🤖 PulseAI")
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
 
-tab_main, tab_researcher, tab_analyst, tab_synthesizer, tab_publisher, tab_log = st.tabs([
-    "🏠 Pipeline",
-    "🔎 Researcher",
-    "📋 Analyst",
-    "🧠 Synthesizer",
-    "📤 Publisher",
-    "📡 Log",
-])
+tab_main, tab_researcher, tab_analyst, tab_synthesizer, tab_publisher, tab_log = st.tabs(
+    [
+        "🏠 Pipeline",
+        "🔎 Researcher",
+        "📋 Analyst",
+        "🧠 Synthesizer",
+        "📤 Publisher",
+        "📡 Log",
+    ]
+)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -132,7 +145,7 @@ with tab_main:
     st.divider()
 
     # ── Status indicators ─────────────────────────────────────────────────────
-    topic         = st.session_state.topic
+    topic = st.session_state.topic
     research_mode = st.session_state.research_mode
 
     si_col1, si_col2, si_col3 = st.columns(3)
@@ -163,11 +176,13 @@ with tab_main:
 
     # ── Topic selection — three inner tabs ────────────────────────────────────
     st.markdown("##### Select Topic")
-    ttab_manual, ttab_trend, ttab_gap = st.tabs([
-        "✏️ Enter Manually",
-        "🔍 Trending Topics",
-        "🔬 Research Gap",
-    ])
+    ttab_manual, ttab_trend, ttab_gap = st.tabs(
+        [
+            "✏️ Enter Manually",
+            "🔍 Trending Topics",
+            "🔬 Research Gap",
+        ]
+    )
 
     with ttab_manual:
         st.caption("Type any topic and set it for the pipeline.")
@@ -215,7 +230,9 @@ with tab_main:
             st.info("Click **Run Trend Agent** to fetch trending topics.")
 
     with ttab_gap:
-        st.caption("Scan recent research papers and identify unexplored gaps. Output will be a structured research paper.")
+        st.caption(
+            "Scan recent research papers and identify unexplored gaps. Output will be a structured research paper."
+        )
         st.markdown("**Search topic** *(defaults to the topic you set above if left blank)*")
         gap_col1, gap_col2 = st.columns([4, 1])
         with gap_col1:
@@ -288,7 +305,7 @@ with tab_main:
     st.markdown("##### Run Individual Agents")
     c1, c2 = st.columns(2)
     with c1:
-        if st.button("🔎 Researcher",  use_container_width=True, disabled=busy):
+        if st.button("🔎 Researcher", use_container_width=True, disabled=busy):
             args = (topic,) if topic else ()
             launch_agent("Researcher Agent", os.path.join(BACKEND_DIR, "agents/researcher_agent.py"), args)
             st.rerun()
@@ -296,7 +313,7 @@ with tab_main:
             launch_agent("Synthesizer Agent", os.path.join(BACKEND_DIR, "agents/synthesizer_agent.py"))
             st.rerun()
     with c2:
-        if st.button("📋 Analyst",   use_container_width=True, disabled=busy):
+        if st.button("📋 Analyst", use_container_width=True, disabled=busy):
             launch_agent("Analyst Agent", os.path.join(BACKEND_DIR, "agents/analyst_agent.py"))
             st.rerun()
         if st.button("📤 Publisher", use_container_width=True, disabled=busy):
@@ -327,30 +344,32 @@ with tab_researcher:
     else:
         scraped = sum(1 for a in data.get("articles", []) if a.get("full_content"))
         st.caption(
-            f"Last run: {data.get('timestamp','?')}  |  "
-            f"Articles: {data.get('total',0)}  |  "
+            f"Last run: {data.get('timestamp', '?')}  |  "
+            f"Articles: {data.get('total', 0)}  |  "
             f"Full content scraped: {scraped}  |  "
             f"Sources: {len(data.get('sources_searched', []))}"
         )
-        articles   = data.get("articles", [])
+        articles = data.get("articles", [])
         categories = {}
         for a in articles:
             categories.setdefault(a.get("category", "news"), []).append(a)
         for cat, cat_articles in categories.items():
             icon = CATEGORY_ICONS.get(cat, "📄")
-            st.markdown(f"### {icon} {cat.replace('_',' ').title()} ({len(cat_articles)})")
+            st.markdown(f"### {icon} {cat.replace('_', ' ').title()} ({len(cat_articles)})")
             for i, a in enumerate(cat_articles, 1):
                 label = f"{i}. {a['title']}"
                 if a.get("full_content"):
                     label += " ✦"
                 with st.expander(label):
-                    st.markdown(f"**Source:** {a.get('source','—')}")
+                    st.markdown(f"**Source:** {a.get('source', '—')}")
                     if a.get("full_content"):
                         st.markdown(f"**Content (scraped):** {a['full_content'][:300]}…")
                     else:
-                        st.markdown(f"**Snippet:** {a.get('snippet','—')}")
-                    if a.get("date"):  st.markdown(f"**Date:** {a['date']}")
-                    if a.get("link"):  st.markdown(f"[🔗 Read more]({a['link']})")
+                        st.markdown(f"**Snippet:** {a.get('snippet', '—')}")
+                    if a.get("date"):
+                        st.markdown(f"**Date:** {a['date']}")
+                    if a.get("link"):
+                        st.markdown(f"[🔗 Read more]({a['link']})")
         st.caption("✦ = full article content scraped")
 
 
@@ -364,7 +383,7 @@ with tab_analyst:
     if data is None:
         st.info("No data yet. Run the Analyst agent.")
     else:
-        st.caption(f"Last run: {data.get('timestamp','?')}  |  Based on {data.get('source_articles',0)} articles")
+        st.caption(f"Last run: {data.get('timestamp', '?')}  |  Based on {data.get('source_articles', 0)} articles")
         st.markdown(data.get("report", "No report found."))
 
 
@@ -378,7 +397,9 @@ with tab_synthesizer:
     if data is None:
         st.info("No data yet. Run the Synthesizer agent.")
     else:
-        st.caption(f"Last run: {data.get('timestamp','?')}  |  {data.get('models_successful',0)}/{data.get('models_queried',5)} models succeeded")
+        st.caption(
+            f"Last run: {data.get('timestamp', '?')}  |  {data.get('models_successful', 0)}/{data.get('models_queried', 5)} models succeeded"
+        )
         st.markdown("### 🏆 Final Consolidated Summary")
         st.success(data.get("final_summary", "No summary."))
         st.markdown("### Individual Model Responses")
@@ -386,9 +407,11 @@ with tab_synthesizer:
         cols = st.columns(2)
         for i, r in enumerate(data.get("model_responses", [])):
             with cols[i % 2]:
-                with st.expander(f"{MODEL_ICONS.get(r['model'],'🤖')} {r['model']} — {status_badge(r['status'])}"):
-                    if r["status"] == "success": st.markdown(r["summary"])
-                    else: st.error(r.get("error", "Unknown error"))
+                with st.expander(f"{MODEL_ICONS.get(r['model'], '🤖')} {r['model']} — {status_badge(r['status'])}"):
+                    if r["status"] == "success":
+                        st.markdown(r["summary"])
+                    else:
+                        st.error(r.get("error", "Unknown error"))
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -399,7 +422,7 @@ with tab_publisher:
     data = load_json("publisher_output.json")
 
     is_research = data.get("mode") == "research" if data else False
-    is_cloud    = data.get("cloud", False) if data else False
+    is_cloud = data.get("cloud", False) if data else False
 
     if is_research:
         st.markdown("### 🔬 Publisher Agent — Research Paper")
@@ -407,7 +430,9 @@ with tab_publisher:
             st.success("☁️ Generated with a cloud model — full 12-15 page academic paper.")
         else:
             st.warning("💻 Generated with a local model — compact draft. Use a cloud model for a full paper.")
-        st.markdown("> This is a draft to help you get started. Do your own research, run experiments, and write the final paper before submitting anywhere.")
+        st.markdown(
+            "> This is a draft to help you get started. Do your own research, run experiments, and write the final paper before submitting anywhere."
+        )
         if data.get("gap"):
             st.info(f"📌 Research Gap Addressed: {data['gap']}")
     else:
@@ -417,12 +442,12 @@ with tab_publisher:
     if data is None:
         st.info("No data yet. Run the Publisher agent.")
     else:
-        st.caption(f"Last run: {data.get('timestamp','?')}  |  Topic: {data.get('topic') or '—'}")
+        st.caption(f"Last run: {data.get('timestamp', '?')}  |  Topic: {data.get('topic') or '—'}")
         article = data.get("final_article", "")
 
         if article:
             dl_col1, dl_col2 = st.columns(2)
-            ext  = "md" if not is_research else "tex"
+            ext = "md" if not is_research else "tex"
             mime = "text/markdown" if not is_research else "text/plain"
             name = "pulseai_paper" if is_research else "pulseai_article"
             with dl_col1:
@@ -456,7 +481,7 @@ with tab_publisher:
 
 with tab_log:
     agent_name = state["running"]
-    logs       = state["logs"]
+    logs = state["logs"]
 
     if agent_name:
         hdr, stop_btn = st.columns([4, 1])
@@ -466,11 +491,11 @@ with tab_log:
             if proc:
                 proc.terminate()
             state["running"] = None
-            state["done"]    = False
+            state["done"] = False
             st.rerun()
     elif logs:
         last_agent = state.get("last_agent", "Agent")
-        last       = logs[-1] if logs else ""
+        last = logs[-1] if logs else ""
         st.markdown(f"##### 📡 {last_agent} — Log")
         if "error" in last.lower() or "failed" in last.lower():
             st.error("❌ Agent failed.")
@@ -497,13 +522,13 @@ elif state["done"]:
     if last_agent == "Trend Agent":
         trend = load_json("trend_output.json")
         if trend and trend.get("topics"):
-            st.session_state.trend_topics      = trend["topics"]
+            st.session_state.trend_topics = trend["topics"]
             st.session_state.research_gap_items = []
     elif last_agent == "Research Gap Agent":
         gaps = load_json("research_gap_output.json")
         if gaps and gaps.get("gaps"):
             st.session_state.research_gap_items = gaps["gaps"]
-            st.session_state.trend_topics       = []
+            st.session_state.trend_topics = []
     state["done"] = False
     time.sleep(0.3)
     st.rerun()

@@ -3,7 +3,6 @@
 # Section headings are derived from the content itself — not a fixed template.
 
 import json
-import os
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -15,7 +14,7 @@ from llm_factory import get_llm
 BASE_DIR = Path(__file__).parent.parent
 load_dotenv(BASE_DIR.parent / ".env")
 
-INPUT_FILE  = BASE_DIR / "output" / "researcher_output.json"
+INPUT_FILE = BASE_DIR / "output" / "researcher_output.json"
 OUTPUT_FILE = BASE_DIR / "output" / "analyst_output.json"
 
 # ── Config ────────────────────────────────────────────────────────────────────
@@ -24,6 +23,7 @@ TOKENS = json.loads((BASE_DIR.parent / "config" / "tokens.json").read_text())
 
 # ── Main agent function ────────────────────────────────────────────────────────
 
+
 def organize_content() -> dict:
     print("Agent 2: Organizing content into a structured report...")
 
@@ -31,8 +31,7 @@ def organize_content() -> dict:
     articles = raw_data["articles"]
 
     articles_text = "\n\n---\n\n".join(
-        f"Title: {a['title']}\nContent: {a.get('full_content') or a['snippet']}\nLink: {a['link']}"
-        for a in articles
+        f"Title: {a['title']}\nContent: {a.get('full_content') or a['snippet']}\nLink: {a['link']}" for a in articles
     )
 
     llm = get_llm("ANALYST")
@@ -77,15 +76,15 @@ Instructions:
         agent=analyst,
     )
 
-    crew   = Crew(agents=[analyst], tasks=[task], verbose=False)
+    crew = Crew(agents=[analyst], tasks=[task], verbose=False)
     result = crew.kickoff()
     report = str(result)
 
     output = {
-        "timestamp":       datetime.now(timezone.utc).isoformat(),
-        "topic":           topic,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "topic": topic,
         "source_articles": len(articles),
-        "report":          report,
+        "report": report,
     }
 
     OUTPUT_FILE.write_text(json.dumps(output, indent=2))

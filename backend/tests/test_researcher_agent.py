@@ -8,19 +8,17 @@ Mocks:
 """
 
 import json
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-
-
 # ── ddg_search ────────────────────────────────────────────────────────────────
+
 
 class TestDdgSearch:
     def test_returns_list_on_success(self, ddg_raw_results):
         with patch("agents.researcher_agent.DDGS") as mock_ddgs:
             mock_ddgs.return_value.__enter__.return_value.text.return_value = ddg_raw_results
             from agents.researcher_agent import ddg_search
+
             result = ddg_search("AI news", max_results=2)
 
         assert isinstance(result, list)
@@ -31,6 +29,7 @@ class TestDdgSearch:
         with patch("agents.researcher_agent.DDGS") as mock_ddgs:
             mock_ddgs.return_value.__enter__.side_effect = Exception("network error")
             from agents.researcher_agent import ddg_search
+
             result = ddg_search("AI news")
 
         assert result == []
@@ -40,12 +39,14 @@ class TestDdgSearch:
             mock_ctx = mock_ddgs.return_value.__enter__.return_value
             mock_ctx.text.return_value = ddg_raw_results
             from agents.researcher_agent import ddg_search
+
             ddg_search("test query", max_results=7)
 
         mock_ctx.text.assert_called_once_with("test query", max_results=7)
 
 
 # ── fetch_latest_ai_concepts ──────────────────────────────────────────────────
+
 
 class TestFetchLatestAiConcepts:
     """All external I/O is mocked: DDG, CrewAI, and file writes."""
@@ -66,14 +67,13 @@ class TestFetchLatestAiConcepts:
     def test_returns_correct_schema(
         self, mock_ddg, mock_llm, mock_agent, mock_task, mock_crew_cls, mock_output_file, sample_articles
     ):
-        mock_ddg.return_value = [
-            {"title": "t", "body": "s", "href": "http://x.com"}
-        ]
+        mock_ddg.return_value = [{"title": "t", "body": "s", "href": "http://x.com"}]
         mock_crew_cls.return_value.kickoff.return_value = self._make_crew_result(sample_articles)
         mock_output_file.parent.mkdir = MagicMock()
         mock_output_file.write_text = MagicMock()
 
         from agents.researcher_agent import fetch_latest_ai_concepts
+
         output = fetch_latest_ai_concepts()
 
         assert "timestamp" in output
@@ -98,6 +98,7 @@ class TestFetchLatestAiConcepts:
         mock_output_file.write_text = MagicMock()
 
         from agents.researcher_agent import fetch_latest_ai_concepts
+
         output = fetch_latest_ai_concepts(topic="multimodal LLMs")
 
         assert output["topic"] == "multimodal LLMs"
@@ -120,6 +121,7 @@ class TestFetchLatestAiConcepts:
         mock_output_file.write_text = MagicMock()
 
         from agents.researcher_agent import fetch_latest_ai_concepts
+
         output = fetch_latest_ai_concepts()
 
         assert output["topic"] == "Latest AI updates"
@@ -142,6 +144,7 @@ class TestFetchLatestAiConcepts:
         mock_output_file.write_text = MagicMock()
 
         from agents.researcher_agent import fetch_latest_ai_concepts
+
         output = fetch_latest_ai_concepts()
 
         # Falls back to raw DDG results — should still have articles
@@ -162,6 +165,7 @@ class TestFetchLatestAiConcepts:
         mock_output_file.write_text = MagicMock()
 
         from agents.researcher_agent import fetch_latest_ai_concepts
+
         fetch_latest_ai_concepts()
 
         mock_output_file.write_text.assert_called_once()
@@ -186,6 +190,7 @@ class TestFetchLatestAiConcepts:
 
         import agents.researcher_agent as ra
         from agents.researcher_agent import fetch_latest_ai_concepts
+
         output = fetch_latest_ai_concepts()
 
         expected_labels = [s["label"] for s in ra.ALL_SEARCHES]

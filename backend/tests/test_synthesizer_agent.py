@@ -13,8 +13,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-
 # ── ask_ollama ────────────────────────────────────────────────────────────────
+
 
 class TestAskOllama:
     def test_returns_response_text_on_success(self):
@@ -24,6 +24,7 @@ class TestAskOllama:
 
         with patch("agents.synthesizer_agent.requests.post", return_value=mock_response):
             from agents.synthesizer_agent import ask_ollama
+
             result = ask_ollama("llama3.2", "Summarize AI trends.", max_tokens=512)
 
         assert result == "LLMs are powerful tools."
@@ -34,6 +35,7 @@ class TestAskOllama:
 
         with patch("agents.synthesizer_agent.requests.post", return_value=mock_response):
             from agents.synthesizer_agent import ask_ollama
+
             with pytest.raises(Exception, match="503"):
                 ask_ollama("llama3.2", "prompt")
 
@@ -43,8 +45,8 @@ class TestAskOllama:
         mock_response.raise_for_status = MagicMock()
 
         with patch("agents.synthesizer_agent.requests.post", return_value=mock_response) as mock_post:
-            import agents.synthesizer_agent as sa
             from agents.synthesizer_agent import ask_ollama
+
             ask_ollama("mistral", "test prompt")
 
         call_url = mock_post.call_args[0][0]
@@ -57,6 +59,7 @@ class TestAskOllama:
 
         with patch("agents.synthesizer_agent.requests.post", return_value=mock_response) as mock_post:
             from agents.synthesizer_agent import ask_ollama
+
             ask_ollama("phi3", "test")
 
         payload = mock_post.call_args[1]["json"]
@@ -65,10 +68,12 @@ class TestAskOllama:
 
 # ── call_model ────────────────────────────────────────────────────────────────
 
+
 class TestCallModel:
     def test_returns_success_dict(self):
         with patch("agents.synthesizer_agent.ask_ollama", return_value="Key insights here."):
             from agents.synthesizer_agent import call_model
+
             result = call_model("Llama 3.2", "llama3.2", "AI report text")
 
         assert result["model"] == "Llama 3.2"
@@ -79,6 +84,7 @@ class TestCallModel:
     def test_returns_error_dict_on_failure(self):
         with patch("agents.synthesizer_agent.ask_ollama", side_effect=Exception("model not found")):
             from agents.synthesizer_agent import call_model
+
             result = call_model("Phi-3", "phi3", "AI report text")
 
         assert result["model"] == "Phi-3"
@@ -88,6 +94,7 @@ class TestCallModel:
 
 
 # ── create_final_summary ──────────────────────────────────────────────────────
+
 
 class TestCreateFinalSummary:
     def _make_crew_result(self, text: str):
@@ -105,10 +112,11 @@ class TestCreateFinalSummary:
         )
         model_responses = [
             {"model": "Llama 3.2", "status": "success", "summary": "Summary 1"},
-            {"model": "Mistral",   "status": "success", "summary": "Summary 2"},
+            {"model": "Mistral", "status": "success", "summary": "Summary 2"},
         ]
 
         from agents.synthesizer_agent import create_final_summary
+
         result = create_final_summary("Report text", model_responses)
 
         assert isinstance(result, str)
@@ -122,10 +130,11 @@ class TestCreateFinalSummary:
         mock_crew_cls.return_value.kickoff.return_value = self._make_crew_result("Final summary.")
         model_responses = [
             {"model": "Llama 3.2", "status": "success", "summary": "Good summary"},
-            {"model": "Phi-3",     "status": "error",   "summary": None, "error": "timeout"},
+            {"model": "Phi-3", "status": "error", "summary": None, "error": "timeout"},
         ]
 
         from agents.synthesizer_agent import create_final_summary
+
         create_final_summary("Report", model_responses)
 
         # Verify kickoff was called (means the crew ran)
@@ -133,6 +142,7 @@ class TestCreateFinalSummary:
 
 
 # ── summarize_with_multiple_models ────────────────────────────────────────────
+
 
 class TestSummarizeWithMultipleModels:
     def _make_crew_result(self, text: str):
@@ -144,15 +154,14 @@ class TestSummarizeWithMultipleModels:
     @patch("agents.synthesizer_agent.INPUT_FILE")
     @patch("agents.synthesizer_agent.create_final_summary")
     @patch("agents.synthesizer_agent.call_model")
-    def test_returns_correct_schema(
-        self, mock_call_model, mock_final, mock_input, mock_output, analyst_output
-    ):
+    def test_returns_correct_schema(self, mock_call_model, mock_final, mock_input, mock_output, analyst_output):
         mock_input.read_text.return_value = json.dumps(analyst_output)
         mock_call_model.return_value = {"model": "Llama 3.2", "status": "success", "summary": "ok"}
         mock_final.return_value = "Consolidated AI summary."
         mock_output.write_text = MagicMock()
 
         from agents.synthesizer_agent import summarize_with_multiple_models
+
         result = summarize_with_multiple_models()
 
         assert "timestamp" in result
@@ -175,6 +184,7 @@ class TestSummarizeWithMultipleModels:
 
         import agents.synthesizer_agent as sa
         from agents.synthesizer_agent import summarize_with_multiple_models
+
         result = summarize_with_multiple_models()
 
         assert result["models_queried"] == len(sa.OLLAMA_MODELS)
@@ -183,22 +193,21 @@ class TestSummarizeWithMultipleModels:
     @patch("agents.synthesizer_agent.INPUT_FILE")
     @patch("agents.synthesizer_agent.create_final_summary")
     @patch("agents.synthesizer_agent.call_model")
-    def test_counts_only_successful_models(
-        self, mock_call_model, mock_final, mock_input, mock_output, analyst_output
-    ):
+    def test_counts_only_successful_models(self, mock_call_model, mock_final, mock_input, mock_output, analyst_output):
         mock_input.read_text.return_value = json.dumps(analyst_output)
         # Alternate success and failure
         mock_call_model.side_effect = [
             {"model": "Llama 3.2", "status": "success", "summary": "ok"},
-            {"model": "Mistral",   "status": "error",   "summary": None, "error": "err"},
-            {"model": "Qwen 2.5",  "status": "success", "summary": "ok"},
-            {"model": "Phi-3",     "status": "error",   "summary": None, "error": "err"},
-            {"model": "Gemma 2",   "status": "success", "summary": "ok"},
+            {"model": "Mistral", "status": "error", "summary": None, "error": "err"},
+            {"model": "Qwen 2.5", "status": "success", "summary": "ok"},
+            {"model": "Phi-3", "status": "error", "summary": None, "error": "err"},
+            {"model": "Gemma 2", "status": "success", "summary": "ok"},
         ]
         mock_final.return_value = "Summary."
         mock_output.write_text = MagicMock()
 
         from agents.synthesizer_agent import summarize_with_multiple_models
+
         result = summarize_with_multiple_models()
 
         assert result["models_successful"] == 3
@@ -207,15 +216,14 @@ class TestSummarizeWithMultipleModels:
     @patch("agents.synthesizer_agent.INPUT_FILE")
     @patch("agents.synthesizer_agent.create_final_summary")
     @patch("agents.synthesizer_agent.call_model")
-    def test_writes_output_file(
-        self, mock_call_model, mock_final, mock_input, mock_output, analyst_output
-    ):
+    def test_writes_output_file(self, mock_call_model, mock_final, mock_input, mock_output, analyst_output):
         mock_input.read_text.return_value = json.dumps(analyst_output)
         mock_call_model.return_value = {"model": "X", "status": "success", "summary": "s"}
         mock_final.return_value = "Summary."
         mock_output.write_text = MagicMock()
 
         from agents.synthesizer_agent import summarize_with_multiple_models
+
         summarize_with_multiple_models()
 
         mock_output.write_text.assert_called_once()
@@ -228,5 +236,6 @@ class TestSummarizeWithMultipleModels:
         mock_input.read_text.side_effect = FileNotFoundError("analyst_output.json not found")
 
         from agents.synthesizer_agent import summarize_with_multiple_models
+
         with pytest.raises(FileNotFoundError):
             summarize_with_multiple_models()

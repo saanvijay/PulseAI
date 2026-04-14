@@ -21,7 +21,7 @@ from llm_factory import get_llm
 BASE_DIR = Path(__file__).parent.parent
 load_dotenv(BASE_DIR.parent / ".env")
 
-INPUT_FILE  = BASE_DIR / "output" / "analyst_output.json"
+INPUT_FILE = BASE_DIR / "output" / "analyst_output.json"
 OUTPUT_FILE = BASE_DIR / "output" / "synthesizer_output.json"
 
 # ── Config ────────────────────────────────────────────────────────────────────
@@ -31,14 +31,15 @@ TOKENS = json.loads((BASE_DIR.parent / "config" / "tokens.json").read_text())
 
 # Models to query in parallel — add/remove based on what you have pulled locally
 OLLAMA_MODELS = [
-    {"name": "Llama 3.2",  "model": "llama3.2"},
-    {"name": "Mistral",    "model": "mistral"},
-    {"name": "Qwen 2.5",   "model": "qwen2.5"},
-    {"name": "Phi-3",      "model": "phi3"},
-    {"name": "Gemma 2",    "model": "gemma2"},
+    {"name": "Llama 3.2", "model": "llama3.2"},
+    {"name": "Mistral", "model": "mistral"},
+    {"name": "Qwen 2.5", "model": "qwen2.5"},
+    {"name": "Phi-3", "model": "phi3"},
+    {"name": "Gemma 2", "model": "gemma2"},
 ]
 
 # ── Retry helper ──────────────────────────────────────────────────────────────
+
 
 def _retry(fn, *args, retries: int = 3, backoff: int = 2, **kwargs):
     """Call fn(*args, **kwargs) up to `retries` times with exponential backoff."""
@@ -48,19 +49,21 @@ def _retry(fn, *args, retries: int = 3, backoff: int = 2, **kwargs):
         except Exception as e:
             if attempt == retries - 1:
                 raise
-            wait = backoff ** attempt
+            wait = backoff**attempt
             print(f"  Retry {attempt + 1}/{retries - 1} after {wait}s ({e})", flush=True)
             time.sleep(wait)
 
+
 # ── Ollama direct API call ─────────────────────────────────────────────────────
+
 
 def _ollama_post(model: str, prompt: str, max_tokens: int) -> str:
     response = requests.post(
         f"{OLLAMA_BASE_URL}/api/generate",
         json={
-            "model":   model,
-            "prompt":  prompt,
-            "stream":  False,
+            "model": model,
+            "prompt": prompt,
+            "stream": False,
             "options": {"num_predict": max_tokens},
         },
         timeout=180,
@@ -72,7 +75,9 @@ def _ollama_post(model: str, prompt: str, max_tokens: int) -> str:
 def ask_ollama(model: str, prompt: str, max_tokens: int = 1024) -> str:
     return _retry(_ollama_post, model, prompt, max_tokens)
 
+
 # ── Per-model call with error handling ────────────────────────────────────────
+
 
 def call_model(name: str, model: str, report: str, topic: str = "") -> dict:
     try:
@@ -99,13 +104,13 @@ def call_model(name: str, model: str, report: str, topic: str = "") -> dict:
         print(f"  {name} failed: {e}", flush=True)
         return {"model": name, "status": "error", "error": str(e), "summary": None}
 
+
 # ── Consolidation via CrewAI + Ollama ─────────────────────────────────────────
 
+
 def create_final_summary(report: str, model_responses: list[dict], topic: str = "") -> str:
-    successful    = [r for r in model_responses if r["status"] == "success"]
-    responses_text = "\n\n---\n\n".join(
-        f"[{r['model']}]:\n{r['summary']}" for r in successful
-    )
+    successful = [r for r in model_responses if r["status"] == "success"]
+    responses_text = "\n\n---\n\n".join(f"[{r['model']}]:\n{r['summary']}" for r in successful)
 
     llm = get_llm("SYNTHESIZER")
 
@@ -120,7 +125,7 @@ def create_final_summary(report: str, model_responses: list[dict], topic: str = 
         verbose=False,
     )
 
-    topic_line  = f'Research topic: "{topic}"\n\n' if topic else ""
+    topic_line = f'Research topic: "{topic}"\n\n' if topic else ""
     topic_focus = f" Everything must stay focused on the research topic: **{topic}**." if topic else ""
 
     task = Task(
@@ -156,7 +161,7 @@ Honest assessment of what's missing, what could go wrong, and unsolved problems.
 The 3-5 most important things to follow up on in the coming weeks.
 
 Guidelines:
-- Stay focused on the topic throughout — every section should tie back to "{topic if topic else 'the research topic'}"
+- Stay focused on the topic throughout — every section should tie back to "{topic if topic else "the research topic"}"
 - Be specific — name models, companies, researchers, and numbers from the report
 - Aim for 600-800 words total
 - Use bullet points within sections where appropriate
@@ -167,29 +172,28 @@ Return only the structured summary with no meta-commentary.""",
         agent=consolidator,
     )
 
-    crew   = Crew(agents=[consolidator], tasks=[task], verbose=False)
+    crew = Crew(agents=[consolidator], tasks=[task], verbose=False)
     result = crew.kickoff()
     return str(result)
 
+
 # ── Main agent function ────────────────────────────────────────────────────────
+
 
 def summarize_with_multiple_models() -> dict:
     print("Agent 3: Querying multiple Ollama models in parallel...")
 
     input_data = json.loads(INPUT_FILE.read_text())
-    report     = input_data["report"]
-    topic      = input_data.get("topic", "")
+    report = input_data["report"]
+    topic = input_data.get("topic", "")
 
     if topic:
-        print(f"  Topic: \"{topic}\"")
+        print(f'  Topic: "{topic}"')
 
     # Query all models in parallel
     model_responses_map: dict[str, dict] = {}
     with ThreadPoolExecutor(max_workers=len(OLLAMA_MODELS)) as executor:
-        futures = {
-            executor.submit(call_model, m["name"], m["model"], report, topic): m["name"]
-            for m in OLLAMA_MODELS
-        }
+        futures = {executor.submit(call_model, m["name"], m["model"], report, topic): m["name"] for m in OLLAMA_MODELS}
         for future in as_completed(futures):
             result = future.result()
             model_responses_map[result["model"]] = result
@@ -204,12 +208,12 @@ def summarize_with_multiple_models() -> dict:
     final_summary = create_final_summary(report, model_responses, topic)
 
     output = {
-        "timestamp":         datetime.now(timezone.utc).isoformat(),
-        "topic":             topic,
-        "models_queried":    len(OLLAMA_MODELS),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "topic": topic,
+        "models_queried": len(OLLAMA_MODELS),
         "models_successful": success_count,
-        "model_responses":   model_responses,
-        "final_summary":     final_summary,
+        "model_responses": model_responses,
+        "final_summary": final_summary,
     }
 
     OUTPUT_FILE.write_text(json.dumps(output, indent=2))

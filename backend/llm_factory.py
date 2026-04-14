@@ -18,10 +18,11 @@
 #   ANTHROPIC_API_KEY=sk-ant-...
 
 import os
+
 from crewai import LLM
 
-OLLAMA_BASE_URL  = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-OLLAMA_MODEL     = os.getenv("OLLAMA_MODEL", "llama3.2")
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2")
 
 
 def get_llm(agent_key: str = "", temperature: float | None = None) -> LLM:
@@ -34,7 +35,7 @@ def get_llm(agent_key: str = "", temperature: float | None = None) -> LLM:
     key = agent_key.upper().replace(" ", "_").replace("-", "_")
 
     # Agent-specific env vars take priority
-    model    = os.getenv(f"{key}_MODEL",    "") or os.getenv("LLM_MODEL",    "")
+    model = os.getenv(f"{key}_MODEL", "") or os.getenv("LLM_MODEL", "")
     provider = os.getenv(f"{key}_PROVIDER", "") or os.getenv("LLM_PROVIDER", "")
     provider = provider.lower()
 
@@ -55,10 +56,7 @@ def get_llm(agent_key: str = "", temperature: float | None = None) -> LLM:
                 **kwargs,
             )
         else:
-            raise ValueError(
-                f"Unsupported LLM provider '{provider}'. "
-                "Choose 'anthropic', 'openai', or 'ollama'."
-            )
+            raise ValueError(f"Unsupported LLM provider '{provider}'. Choose 'anthropic', 'openai', or 'ollama'.")
         _log(agent_key, provider, model)
         return llm
 
@@ -74,7 +72,7 @@ def get_llm(agent_key: str = "", temperature: float | None = None) -> LLM:
 
 def is_cloud_provider(agent_key: str = "") -> bool:
     """Return True if the given agent is configured to use a cloud provider."""
-    key      = agent_key.upper().replace(" ", "_").replace("-", "_")
+    key = agent_key.upper().replace(" ", "_").replace("-", "_")
     provider = os.getenv(f"{key}_PROVIDER", "") or os.getenv("LLM_PROVIDER", "")
     return provider.lower() in ("anthropic", "openai")
 

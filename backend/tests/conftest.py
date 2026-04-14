@@ -2,7 +2,6 @@
 Shared fixtures for PulseAI agent tests.
 """
 
-import json
 import sys
 from pathlib import Path
 
@@ -14,6 +13,7 @@ sys.path.insert(0, str(BACKEND_DIR))
 
 
 # ── Sample data fixtures ───────────────────────────────────────────────────────
+
 
 @pytest.fixture
 def sample_articles():
@@ -90,10 +90,10 @@ def synthesizer_output():
         "models_successful": 3,
         "model_responses": [
             {"model": "Llama 3.2", "status": "success", "summary": "LLMs are improving rapidly."},
-            {"model": "Mistral",   "status": "success", "summary": "Reasoning breakthroughs dominate."},
-            {"model": "Qwen 2.5",  "status": "success", "summary": "Multimodal models are trending."},
-            {"model": "Phi-3",     "status": "error",   "error": "model not found", "summary": None},
-            {"model": "Gemma 2",   "status": "error",   "error": "timeout",         "summary": None},
+            {"model": "Mistral", "status": "success", "summary": "Reasoning breakthroughs dominate."},
+            {"model": "Qwen 2.5", "status": "success", "summary": "Multimodal models are trending."},
+            {"model": "Phi-3", "status": "error", "error": "model not found", "summary": None},
+            {"model": "Gemma 2", "status": "error", "error": "timeout", "summary": None},
         ],
         "final_summary": (
             "The AI landscape is rapidly evolving with breakthrough models from Anthropic, "
@@ -109,12 +109,12 @@ def ddg_raw_results():
     return [
         {
             "title": "Claude 3.5 Sonnet Released",
-            "body":  "Anthropic releases new model with enhanced reasoning.",
-            "href":  "https://anthropic.com/claude-3-5",
+            "body": "Anthropic releases new model with enhanced reasoning.",
+            "href": "https://anthropic.com/claude-3-5",
         },
         {
             "title": "GPT-5 Coding Benchmarks",
-            "body":  "OpenAI GPT-5 achieves top scores on HumanEval.",
-            "href":  "https://openai.com/gpt-5",
+            "body": "OpenAI GPT-5 achieves top scores on HumanEval.",
+            "href": "https://openai.com/gpt-5",
         },
     ]

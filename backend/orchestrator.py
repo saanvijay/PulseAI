@@ -11,11 +11,11 @@ from pathlib import Path
 BASE_DIR = Path(__file__).parent
 sys.path.insert(0, str(BASE_DIR))
 
-from agents.researcher_agent  import fetch_latest_ai_concepts
-from agents.analyst_agent     import organize_content
-from agents.synthesizer_agent import summarize_with_multiple_models
-from agents.publisher_agent   import publish_results
-from agents.paper_writer_agent import write_research_paper
+from agents.analyst_agent import organize_content  # noqa: E402
+from agents.paper_writer_agent import write_research_paper  # noqa: E402
+from agents.publisher_agent import publish_results  # noqa: E402
+from agents.researcher_agent import fetch_latest_ai_concepts  # noqa: E402
+from agents.synthesizer_agent import summarize_with_multiple_models  # noqa: E402
 
 
 def run_pipeline(topic: str = "", research_mode: bool = False) -> None:
@@ -60,10 +60,10 @@ def run_pipeline(topic: str = "", research_mode: bool = False) -> None:
 
 
 if __name__ == "__main__":
-    args          = sys.argv[1:]
+    args = sys.argv[1:]
     research_mode = "--research" in args
-    topic_args    = [a for a in args if not a.startswith("--")]
-    topic         = topic_args[0] if topic_args else ""
+    topic_args = [a for a in args if not a.startswith("--")]
+    topic = topic_args[0] if topic_args else ""
     try:
         run_pipeline(topic, research_mode)
     except Exception as e:
