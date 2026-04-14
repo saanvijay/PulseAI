@@ -1,5 +1,9 @@
 # 🤖 PulseAI — AI Research & Content Pipeline
 
+[![CI](https://github.com/saanvijay/PulseAI/actions/workflows/ci.yml/badge.svg)](https://github.com/saanvijay/PulseAI/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
 PulseAI is a **multi-agent AI pipeline** that turns any topic into a ready-to-publish article or a structured research paper draft — running entirely on **local models** via **CrewAI + Ollama**, with optional cloud model support for higher quality output.
 
 It covers two distinct workflows:
