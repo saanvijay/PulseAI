@@ -36,7 +36,7 @@ class TestOrganizeContent:
     @patch("agents.analyst_agent.Crew")
     @patch("agents.analyst_agent.Task")
     @patch("agents.analyst_agent.Agent")
-    @patch("agents.analyst_agent.LLM")
+    @patch("agents.analyst_agent.get_llm")
     def test_returns_correct_schema(
         self, mock_llm, mock_agent, mock_task, mock_crew_cls, mock_input, mock_output, researcher_output
     ):
@@ -57,7 +57,7 @@ class TestOrganizeContent:
     @patch("agents.analyst_agent.Crew")
     @patch("agents.analyst_agent.Task")
     @patch("agents.analyst_agent.Agent")
-    @patch("agents.analyst_agent.LLM")
+    @patch("agents.analyst_agent.get_llm")
     def test_source_articles_count_matches_input(
         self, mock_llm, mock_agent, mock_task, mock_crew_cls, mock_input, mock_output, researcher_output
     ):
@@ -76,7 +76,7 @@ class TestOrganizeContent:
     @patch("agents.analyst_agent.Crew")
     @patch("agents.analyst_agent.Task")
     @patch("agents.analyst_agent.Agent")
-    @patch("agents.analyst_agent.LLM")
+    @patch("agents.analyst_agent.get_llm")
     def test_report_is_string(
         self, mock_llm, mock_agent, mock_task, mock_crew_cls, mock_input, mock_output, researcher_output
     ):
@@ -96,7 +96,7 @@ class TestOrganizeContent:
     @patch("agents.analyst_agent.Crew")
     @patch("agents.analyst_agent.Task")
     @patch("agents.analyst_agent.Agent")
-    @patch("agents.analyst_agent.LLM")
+    @patch("agents.analyst_agent.get_llm")
     def test_writes_output_file(
         self, mock_llm, mock_agent, mock_task, mock_crew_cls, mock_input, mock_output, researcher_output
     ):
@@ -119,7 +119,7 @@ class TestOrganizeContent:
     @patch("agents.analyst_agent.Crew")
     @patch("agents.analyst_agent.Task")
     @patch("agents.analyst_agent.Agent")
-    @patch("agents.analyst_agent.LLM")
+    @patch("agents.analyst_agent.get_llm")
     def test_crew_kickoff_is_called_once(
         self, mock_llm, mock_agent, mock_task, mock_crew_cls, mock_input, mock_output, researcher_output
     ):

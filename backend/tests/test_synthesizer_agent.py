@@ -105,7 +105,7 @@ class TestCreateFinalSummary:
     @patch("agents.synthesizer_agent.Crew")
     @patch("agents.synthesizer_agent.Task")
     @patch("agents.synthesizer_agent.Agent")
-    @patch("agents.synthesizer_agent.LLM")
+    @patch("agents.synthesizer_agent.get_llm")
     def test_returns_string(self, mock_llm, mock_agent, mock_task, mock_crew_cls):
         mock_crew_cls.return_value.kickoff.return_value = self._make_crew_result(
             "AI is advancing rapidly with new models from top labs."
@@ -125,7 +125,7 @@ class TestCreateFinalSummary:
     @patch("agents.synthesizer_agent.Crew")
     @patch("agents.synthesizer_agent.Task")
     @patch("agents.synthesizer_agent.Agent")
-    @patch("agents.synthesizer_agent.LLM")
+    @patch("agents.synthesizer_agent.get_llm")
     def test_skips_failed_models(self, mock_llm, mock_agent, mock_task, mock_crew_cls):
         mock_crew_cls.return_value.kickoff.return_value = self._make_crew_result("Final summary.")
         model_responses = [
@@ -156,7 +156,7 @@ class TestSummarizeWithMultipleModels:
     @patch("agents.synthesizer_agent.call_model")
     def test_returns_correct_schema(self, mock_call_model, mock_final, mock_input, mock_output, analyst_output):
         mock_input.read_text.return_value = json.dumps(analyst_output)
-        mock_call_model.return_value = {"model": "Llama 3.2", "status": "success", "summary": "ok"}
+        mock_call_model.side_effect = lambda name, model, report, topic="": {"model": name, "status": "success", "summary": "ok"}
         mock_final.return_value = "Consolidated AI summary."
         mock_output.write_text = MagicMock()
 
@@ -178,7 +178,7 @@ class TestSummarizeWithMultipleModels:
         self, mock_call_model, mock_final, mock_input, mock_output, analyst_output
     ):
         mock_input.read_text.return_value = json.dumps(analyst_output)
-        mock_call_model.return_value = {"model": "X", "status": "success", "summary": "s"}
+        mock_call_model.side_effect = lambda name, model, report, topic="": {"model": name, "status": "success", "summary": "s"}
         mock_final.return_value = "Summary."
         mock_output.write_text = MagicMock()
 
@@ -218,7 +218,7 @@ class TestSummarizeWithMultipleModels:
     @patch("agents.synthesizer_agent.call_model")
     def test_writes_output_file(self, mock_call_model, mock_final, mock_input, mock_output, analyst_output):
         mock_input.read_text.return_value = json.dumps(analyst_output)
-        mock_call_model.return_value = {"model": "X", "status": "success", "summary": "s"}
+        mock_call_model.side_effect = lambda name, model, report, topic="": {"model": name, "status": "success", "summary": "s"}
         mock_final.return_value = "Summary."
         mock_output.write_text = MagicMock()
 

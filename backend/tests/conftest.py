@@ -103,18 +103,3 @@ def synthesizer_output():
     }
 
 
-@pytest.fixture
-def ddg_raw_results():
-    """Raw DuckDuckGo results as returned by DDGS().text()."""
-    return [
-        {
-            "title": "Claude 3.5 Sonnet Released",
-            "body": "Anthropic releases new model with enhanced reasoning.",
-            "href": "https://anthropic.com/claude-3-5",
-        },
-        {
-            "title": "GPT-5 Coding Benchmarks",
-            "body": "OpenAI GPT-5 achieves top scores on HumanEval.",
-            "href": "https://openai.com/gpt-5",
-        },
-    ]
